@@ -3,6 +3,7 @@ import { X, Plus } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { AiBadge } from '@/features/ai/ai-badge'
 
 interface TagListInputProps {
   label: string
@@ -30,19 +31,20 @@ export function TagListInput({ label, values: rawValues, onChange, placeholder, 
     <div className="flex flex-col gap-1.5">
       <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
         {label}
-        {aiPopulated && (
-          <Badge variant="ai" className="px-1.5 py-0 text-[10px]">
-            AI
-          </Badge>
-        )}
+        {aiPopulated && <AiBadge />}
       </label>
       {values.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {values.map((v) => (
-            <Badge key={v} variant="outline" className="gap-1 pr-1.5">
+            <Badge key={v} variant="outline" className="gap-1 pr-1">
               {v}
-              <button type="button" onClick={() => remove(v)} className="rounded-full p-0.5 hover:bg-secondary">
-                <X className="size-3" />
+              <button
+                type="button"
+                onClick={() => remove(v)}
+                aria-label={`Remove ${v}`}
+                className="rounded-sm p-0.5 outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <X className="size-3" aria-hidden="true" />
               </button>
             </Badge>
           ))}
