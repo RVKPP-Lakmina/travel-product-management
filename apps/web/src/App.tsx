@@ -1,6 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router'
 import { ThemeProvider } from '@/app/theme-provider'
+import { SidebarProvider } from '@/app/sidebar-provider'
+import { DensityProvider } from '@/app/density-provider'
 import { AuthProvider } from '@/features/auth/auth-provider'
 import { Toaster } from '@/components/ui/sonner'
 import { AppRoutes } from '@/app/routes'
@@ -24,14 +26,18 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-          <Toaster />
-        </AuthProvider>
-      </QueryClientProvider>
+      <SidebarProvider>
+        <DensityProvider>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <BrowserRouter>
+                <AppRoutes />
+              </BrowserRouter>
+              <Toaster />
+            </AuthProvider>
+          </QueryClientProvider>
+        </DensityProvider>
+      </SidebarProvider>
     </ThemeProvider>
   )
 }
