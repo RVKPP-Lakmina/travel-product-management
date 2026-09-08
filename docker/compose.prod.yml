@@ -5,21 +5,55 @@ services:
       dockerfile: apps/api/Dockerfile
       target: production
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    env_file:
+      - ../apps/api/.env
     environment:
       NODE_ENV: production
-      PORT: 3000
-      DATABASE_URL: ${DATABASE_URL}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-    ports:
-      - "3000:3000"
+      SUPABASE_URL: ${API_SUPABASE_URL:-http://host.docker.internal:54321}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    expose:
+      - "3000"
 
   web:
     build:
       context: ..
       dockerfile: apps/web/Dockerfile
       target: production
+      args:
+        VITE_API_URL: /api
+        VITE_SUPABASE_URL: ${WEB_SUPABASE_URL:-http://127.0.0.1:54321}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY:?set this to your Supabase publishable/anon key}
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
     ports:
-      - "80:80"
+      - "80:8080"
     depends_on:
       - api
