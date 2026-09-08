@@ -5,6 +5,9 @@ on:
     branches: [main, development]
   pull_request:
 
+# Read-only by default -- nothing in this workflow needs to write to the
+# repo, comment on PRs, or push packages, so it doesn't get the token
+# scope to do any of that.
 permissions:
   contents: read
 
@@ -17,23 +20,44 @@ jobs:
     name: Lint, typecheck, test, build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
-      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+      # Actions pinned to a specific commit SHA, not a mutable tag --
+      # a tag can be moved to point at different code after the fact,
+      # a commit SHA cannot. The version comment next to each is purely
+      # informational, for humans updating the pin later.
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1 # v4.2.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 22
           cache: pnpm
 
+      # --frozen-lockfile: fail the build rather than silently resolving a
+      # different dependency tree than what's committed.
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Lint, typecheck, test, build (all packages)
         run: pnpm turbo run lint check-types test build
 
+      # Non-blocking for now (deps this actively maintained still get the
+      # occasional moderate/high advisory with no available fix) -- flips
+      # to blocking once the project has a documented triage process for
+      # advisories that can't just be bumped away immediately.
       - name: Dependency audit (high+ severity)
         run: pnpm audit --audit-level=high
         continue-on-error: true
 
+      # The real check this repo relies on: server-only secrets must never
+      # be reachable from apps/web, in source OR in the built bundle. See
+      # apps/web/.env.example and the plan's "VITE_ prefix" writeup for why
+      # this specific mistake (a developer adding VITE_ to a secret while
+      # debugging an `undefined` value) is the one worth guarding here.
+      #
+      # The pattern looks for a VITE_-prefixed secret NAME or an actual
+      # key-shaped VALUE -- not the bare words SERVICE_ROLE/SECRET_KEY,
+      # which also appear in this codebase's own comments explaining why
+      # those secrets must stay server-only. Banning the words themselves
+      # would fail CI on that documentation, not on a real leak.
       - name: Secret-scan apps/web source
         run: |
           PATTERN='VITE_[A-Z_]*(SERVICE_ROLE|SECRET_KEY|OPENAI_API_KEY)|sk-[A-Za-z0-9]{10,}|sb_secret_[A-Za-z0-9_-]+'
@@ -61,6 +85,9 @@ jobs:
         run: docker build -f apps/api/Dockerfile --target production -t travel-api:ci .
 
       - name: Build web production image
+        # Build-time values only -- not secrets, and not the real project.
+        # This job proves the Dockerfile builds; it never runs the image
+        # against a real backend.
         run: |
           docker build -f apps/web/Dockerfile --target production \
             --build-arg VITE_SUPABASE_URL=https://ci-placeholder.supabase.co \
