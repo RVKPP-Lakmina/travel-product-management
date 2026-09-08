@@ -1,6 +1,9 @@
 import { supabase } from './supabase'
 
-const API_URL = import.meta.env.VITE_API_URL ?? '/api'
+// Versioned API base. The relative fallback matches nginx's same-origin
+// proxy (docker/nginx/default.conf); VITE_API_URL overrides it for
+// host-native / Docker dev.
+const API_URL = import.meta.env.VITE_API_URL ?? '/api/v1'
 
 export class ApiError extends Error {
   status: number
