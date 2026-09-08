@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CATEGORY_SLUGS } from './categories.js';
+import { productResponseSchema } from './product.schema.js';
 
 // ============================================================================
 // Date anchors — how the API tells the model "today" and common relative
@@ -129,44 +130,68 @@ export const aiGenerateProductRequestSchema = z.strictObject({
 // real injection-adjacent bug class in filter DSLs). `limit`/`offset` are
 // clamped here AND again server-side regardless of what the model claims.
 // ============================================================================
-export const searchFilterSchema = z
-  .strictObject({
-    destinations: z.array(z.string().trim().min(2).max(60)).max(5).default([]),
-    categories: z.array(z.enum(CATEGORY_SLUGS)).max(5).default([]),
-    status: z.enum(['active', 'inactive', 'any']).default('any'),
-    price: z
-      .strictObject({
-        min: z.number().nonnegative().max(100_000_000).nullable(),
-        max: z.number().nonnegative().max(100_000_000).nullable(),
-        currency: z.literal('LKR'),
-      })
-      .nullable()
-      .default(null),
-    inventory: z
-      .strictObject({
-        min: z.number().int().min(0).nullable(),
-      })
-      .nullable()
-      .default(null),
-    validOn: z.iso.date().nullable().default(null),
-    keywords: z.array(z.string().trim().min(2).max(40)).max(6).default([]),
-    sort: z
-      .enum(['relevance', 'price_asc', 'price_desc', 'valid_until_asc', 'created_desc'])
-      .default('relevance'),
-    limit: z.number().int().min(1).max(50).default(20),
-    offset: z.number().int().min(0).max(1000).default(0),
-  })
-  .superRefine((val, ctx) => {
-    if (val.price && val.price.min != null && val.price.max != null && val.price.min > val.price.max) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['price', 'min'],
-        message: 'price.min must be <= price.max',
-      });
-    }
-  });
+// Extracted as a plain shape object (not a schema) so it can be reused by
+// TWO schemas below: `searchFilterSchema` (the DSL as re-validated and
+// compiled into a query) and `searchFilterWireSchema` (what the model is
+// actually asked to produce, which additionally needs an `explanation`
+// field). Kept as one shape definition rather than two independently
+// maintained schemas that could silently drift apart.
+const searchFilterShape = {
+  destinations: z.array(z.string().trim().min(2).max(60)).max(5).default([]),
+  categories: z.array(z.enum(CATEGORY_SLUGS)).max(5).default([]),
+  status: z.enum(['active', 'inactive', 'any']).default('any'),
+  price: z
+    .strictObject({
+      min: z.number().nonnegative().max(100_000_000).nullable(),
+      max: z.number().nonnegative().max(100_000_000).nullable(),
+      currency: z.literal('LKR'),
+    })
+    .nullable()
+    .default(null),
+  inventory: z
+    .strictObject({
+      min: z.number().int().min(0).nullable(),
+    })
+    .nullable()
+    .default(null),
+  validOn: z.iso.date().nullable().default(null),
+  keywords: z.array(z.string().trim().min(2).max(40)).max(6).default([]),
+  sort: z
+    .enum(['relevance', 'price_asc', 'price_desc', 'valid_until_asc', 'created_desc'])
+    .default('relevance'),
+  limit: z.number().int().min(1).max(50).default(20),
+  offset: z.number().int().min(0).max(1000).default(0),
+};
+
+function priceRangeRefine(val: { price: { min: number | null; max: number | null } | null }, ctx: z.RefinementCtx) {
+  if (val.price && val.price.min != null && val.price.max != null && val.price.min > val.price.max) {
+    ctx.addIssue({ code: 'custom', path: ['price', 'min'], message: 'price.min must be <= price.max' });
+  }
+}
+
+export const searchFilterSchema = z.strictObject(searchFilterShape).superRefine(priceRangeRefine);
 
 export type SearchFilter = z.infer<typeof searchFilterSchema>;
+
+/**
+ * What the model is actually asked to produce for AI search — the DSL
+ * fields above PLUS a one-sentence `explanation`. This, not
+ * `searchFilterSchema`, is what gets turned into the OpenAI strict JSON
+ * Schema (apps/api/src/ai/search/search.service.ts). Sending
+ * `searchFilterSchema` alone would leave the model with literally nowhere
+ * to put the explanation the prompt asks for — strict mode's
+ * `additionalProperties: false` means a field absent from the schema
+ * cannot appear in the output at all, prompt instructions notwithstanding.
+ * The server extracts `filter` fields back out via `searchFilterSchema`
+ * before compiling a query — the wire schema is never used as the trusted
+ * shape on its own.
+ */
+export const searchFilterWireSchema = z
+  .strictObject({
+    ...searchFilterShape,
+    explanation: z.string(),
+  })
+  .superRefine(priceRangeRefine);
 
 export const aiSearchRequestSchema = z.strictObject({
   query: z.string().trim().min(2).max(400),
@@ -181,6 +206,7 @@ export const aiSearchResponseSchema = z.object({
   // React text node on the frontend, never through dangerouslySetInnerHTML
   // or a markdown renderer.
   explanation: z.string().max(200),
+  results: z.array(productResponseSchema),
   total: z.number().int(),
   meta: z.object({
     latencyMs: z.number(),
