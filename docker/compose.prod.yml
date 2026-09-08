@@ -58,12 +58,13 @@ services:
       args:
         # Baked into the JS bundle at build time (Vite inlines VITE_* at
         # build, not runtime) -- these three ARE meant to be public, see
-        # apps/web/.env.example. VITE_API_URL stays relative (/api) so
-        # nginx's same-origin proxy handles it; the Supabase values default
-        # to a local `supabase start` stack reachable from the BROWSER
-        # (which runs on the host, unlike the api container above -- hence
-        # 127.0.0.1 here vs host.docker.internal there).
-        VITE_API_URL: /api
+        # apps/web/.env.example. VITE_API_URL stays relative (/api/v1 -- URI
+        # versioning, see apps/api/src/main.ts) so nginx's same-origin proxy
+        # handles it; the Supabase values default to a local `supabase start`
+        # stack reachable from the BROWSER (which runs on the host, unlike
+        # the api container above -- hence 127.0.0.1 here vs
+        # host.docker.internal there).
+        VITE_API_URL: /api/v1
         VITE_SUPABASE_URL: ${WEB_SUPABASE_URL:-http://127.0.0.1:54321}
         VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY:?set this to your Supabase publishable/anon key}
     restart: unless-stopped
