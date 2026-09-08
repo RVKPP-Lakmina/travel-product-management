@@ -1,9 +1,18 @@
-import { Controller, Get, Inject, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Inject,
+  ServiceUnavailableException,
+  VERSION_NEUTRAL,
+} from '@nestjs/common';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Public } from '../common/decorators/public.decorator.js';
 import { SUPABASE_CLIENT } from '../common/supabase/supabase.constants.js';
 
-@Controller('health')
+// VERSION_NEUTRAL: probes stay at /api/health and /api/health/ready across
+// every API version — orchestrators and uptime checks shouldn't have to
+// track the versioned contract.
+@Controller({ path: 'health', version: VERSION_NEUTRAL })
 export class HealthController {
   constructor(@Inject(SUPABASE_CLIENT) private readonly supabase: SupabaseClient) {}
 
