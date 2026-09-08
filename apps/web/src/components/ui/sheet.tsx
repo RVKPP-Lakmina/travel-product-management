@@ -21,25 +21,33 @@ function SheetOverlay({ className, ...props }: React.ComponentProps<typeof Dialo
 }
 
 /**
- * Responsive "sheet" — a bottom sheet on mobile, a left-anchored sidebar
- * drawer on larger screens (used for the mobile nav). Content that should
- * instead go centered-modal-on-mobile too (the AI generate dialog) uses
- * ResponsiveDialogContent below, not this.
+ * Edge-anchored drawer. `side="left"` (default) is the mobile nav; the
+ * `right` variant is wider and used for the product quick-peek. Content
+ * that should be a centered-modal-on-desktop instead uses
+ * ResponsiveDialogContent below.
  */
-function SheetContent({ className, children, ...props }: React.ComponentProps<typeof DialogPrimitive.Content>) {
+function SheetContent({
+  className,
+  children,
+  side = 'left',
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Content> & { side?: 'left' | 'right' }) {
   return (
     <SheetPortal>
       <SheetOverlay />
       <DialogPrimitive.Content
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex h-full w-72 flex-col gap-4 border-r border-border bg-card p-4 shadow-lg',
-          'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left duration-300',
+          'fixed inset-y-0 z-50 flex h-full flex-col gap-4 border-border bg-card p-4 shadow-md',
+          'data-[state=open]:animate-in data-[state=closed]:animate-out duration-300',
+          side === 'left'
+            ? 'left-0 w-72 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left'
+            : 'right-0 w-full max-w-md border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right',
           className,
         )}
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-3 top-3 rounded-md p-1 opacity-70 outline-none hover:bg-secondary hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring">
+        <DialogPrimitive.Close className="absolute right-3 top-3 rounded-md bg-background/70 p-1 opacity-80 outline-none backdrop-blur-sm hover:bg-secondary hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring">
           <X className="size-4" />
           <span className="sr-only">Close</span>
         </DialogPrimitive.Close>
@@ -64,12 +72,12 @@ function ResponsiveDialogContent({
       <SheetOverlay />
       <DialogPrimitive.Content
         className={cn(
-          'fixed z-50 flex flex-col gap-4 border border-border bg-card shadow-lg',
+          'fixed z-50 flex flex-col gap-4 border border-border bg-card shadow-md',
           // Mobile: full-width bottom sheet
-          'inset-x-0 bottom-0 max-h-[92vh] rounded-t-2xl p-5',
+          'inset-x-0 bottom-0 max-h-[92vh] rounded-t-lg p-5',
           'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
           // sm+: centered modal
-          'sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-h-[85vh] sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl sm:p-6',
+          'sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-h-[85vh] sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg sm:p-6',
           'sm:data-[state=open]:slide-in-from-bottom-0 sm:data-[state=closed]:slide-out-to-bottom-0 sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:zoom-out-95',
           'overflow-y-auto',
           className,
