@@ -17,6 +17,7 @@ import {
   createProductSchema,
   updateProductSchema,
   productQuerySchema,
+  expiredQuerySchema,
   searchFilterSchema,
   type SearchFilter,
 } from '@travel/validation';
@@ -67,6 +68,19 @@ export class ProductsController {
   @Get('dashboard')
   dashboard() {
     return this.products.dashboardStats();
+  }
+
+  // Also BEFORE `:id`, same reason — "expired" is not a UUID and
+  // ParseUUIDPipe would 400 it.
+  @Get('expired')
+  findExpired(@Query(new ZodValidationPipe(expiredQuerySchema)) query: unknown) {
+    return this.products.findExpired(query as ReturnType<typeof expiredQuerySchema.parse>);
+  }
+
+  // BEFORE `:id` — same reason as `dashboard`/`expired`.
+  @Get('analytics')
+  analytics() {
+    return this.products.analytics();
   }
 
   /** Exports exactly the filter currently applied in the UI — including a multi-value AI-derived filter. */
