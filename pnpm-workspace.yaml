@@ -1,3 +1,15 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+overrides:
+  typescript: 6.0.3
+  zod: 4.5.4
+
+# Lifecycle (postinstall) scripts are blocked by default in modern pnpm —
+# good, that's a real supply-chain control. esbuild is the one dependency
+# (via tsup) that legitimately needs its install script to fetch its
+# platform binary, so it's explicitly allowlisted rather than disabling the
+# protection globally.
+allowBuilds:
+  esbuild: true
