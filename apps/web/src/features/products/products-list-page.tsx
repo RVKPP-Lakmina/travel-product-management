@@ -1,32 +1,42 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { Plus, FileSpreadsheet, ChevronDown, Trash2, PackageSearch, PackageX } from 'lucide-react'
+import { Plus, FileSpreadsheet, ChevronDown, Trash2, PackageSearch, PackageX, AlertTriangle, RotateCcw, CalendarX } from 'lucide-react'
 import { searchFilterSchema, type SearchFilter, type ProductResponse } from '@travel/validation'
-import { useProducts, useProductsByFilter, useDeleteProduct, useGenerateProductImage } from './hooks'
+import {
+  useProducts,
+  useProductsByFilter,
+  useExpiredProducts,
+  useDeleteProduct,
+  useGenerateProductImage,
+} from './hooks'
 import { useAiSearch } from '@/features/ai/hooks'
 import { useExportExcel } from '@/features/export/hooks'
+import { SEARCH_QUERIES } from '@/features/ai/examples'
 import { AiSearchBar } from '@/features/ai/ai-search-bar'
 import { FilterChips } from '@/features/ai/filter-chips'
 import { GenerateProductDialog } from '@/features/ai/generate-product-dialog'
-import { ProductRow } from './product-row'
-import { ProductCard } from './product-card'
+import { ProductCollection, type SortValue } from './product-collection'
+import { ProductPeek } from './product-peek'
 import { DeleteConfirmDialog } from './delete-confirm-dialog'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Table, TableHeader, TableBody, TableRow, TableHead } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import { ApiError } from '@/lib/api'
 
 const PAGE_SIZE = 20
+type Tab = 'all' | 'expired'
 
 export function ProductsListPage() {
+  const [tab, setTab] = useState<Tab>('all')
   const [aiFilter, setAiFilter] = useState<SearchFilter | null>(null)
   const [aiMeta, setAiMeta] = useState<{ source: 'ai' | 'heuristic'; explanation: string } | null>(null)
+  const [sort, setSort] = useState<SortValue>('created_desc')
   const [page, setPage] = useState(0)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [deleteTarget, setDeleteTarget] = useState<ProductResponse | null>(null)
+  const [peekTarget, setPeekTarget] = useState<ProductResponse | null>(null)
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
 
   const navigate = useNavigate()
@@ -38,21 +48,36 @@ export function ProductsListPage() {
   const active = aiFilter !== null
 
   const plain = useProducts({
-    sort: 'created_desc',
+    sort,
     status: 'any',
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
   })
   const filteredQuery: SearchFilter | null = useMemo(
-    () => (aiFilter ? { ...aiFilter, limit: PAGE_SIZE, offset: page * PAGE_SIZE } : null),
-    [aiFilter, page],
+    () => (aiFilter ? { ...aiFilter, sort, limit: PAGE_SIZE, offset: page * PAGE_SIZE } : null),
+    [aiFilter, sort, page],
   )
   const filtered = useProductsByFilter(filteredQuery)
+  const expired = useExpiredProducts({
+    limit: PAGE_SIZE,
+    offset: tab === 'expired' ? page * PAGE_SIZE : 0,
+  })
 
-  const query = active ? filtered : plain
+  const query = tab === 'expired' ? expired : active ? filtered : plain
   const items = query.data?.items ?? []
   const total = query.data?.total ?? 0
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const expiredTotal = expired.data?.total ?? 0
+
+  function switchTab(next: Tab) {
+    setTab(next)
+    setPage(0)
+    setSelected(new Set())
+  }
+
+  function changeSort(next: SortValue) {
+    setSort(next)
+    setPage(0)
+  }
 
   async function handleSearch(q: string) {
     setPage(0)
@@ -96,7 +121,7 @@ export function ProductsListPage() {
     toast.success('Selected products deleted.')
   }
 
-  async function handleGenerateImage(product: ProductResponse) {
+  function handleGenerateImage(product: ProductResponse) {
     toast.promise(generateImage.mutateAsync(product.id), {
       loading: `Generating an image for ${product.name}…`,
       success: 'Image generated.',
@@ -105,31 +130,42 @@ export function ProductsListPage() {
   }
 
   function currentExportFilter(): SearchFilter {
-    return aiFilter ?? searchFilterSchema.parse({ sort: 'created_desc' })
+    return aiFilter ?? searchFilterSchema.parse({ sort })
+  }
+
+  const collectionProps = {
+    items,
+    total,
+    page,
+    pageSize: PAGE_SIZE,
+    onPageChange: setPage,
+    onDelete: setDeleteTarget,
+    onGenerateImage: handleGenerateImage,
+    onPeek: setPeekTarget,
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="page-enter mx-auto flex w-full max-w-350 flex-col gap-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold sm:text-2xl">Products</h1>
           <p className="text-sm text-muted-foreground">Manage your travel product catalog</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <GenerateProductDialog
-            onApply={(draft, meta) => navigate('/products/new', { state: { draft, meta } })}
-          />
-          <Button asChild variant="secondary">
+          <Button asChild>
             <Link to="/products/new">
               <Plus />
               Add Product
             </Link>
           </Button>
+          <GenerateProductDialog
+            onApply={(draft, meta) => navigate('/products/new', { state: { draft, meta } })}
+          />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">
                 Export
-                <ChevronDown className="size-3.5" />
+                <ChevronDown />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -145,116 +181,112 @@ export function ProductsListPage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3">
-        <AiSearchBar onSearch={handleSearch} onClear={handleClearSearch} loading={aiSearch.isPending} active={active} />
-        {active && aiFilter && aiMeta && (
-          <FilterChips
-            filter={aiFilter}
-            source={aiMeta.source}
-            explanation={aiMeta.explanation}
-            onRemove={handleRemoveChip}
-            onClear={handleClearSearch}
-          />
-        )}
-      </div>
+      <Tabs value={tab} onValueChange={(v) => switchTab(v as Tab)}>
+        <TabsList>
+          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="expired">
+            Expired
+            {expiredTotal > 0 && (
+              <span className="tabular-nums text-xs text-muted-foreground">{expiredTotal}</span>
+            )}
+          </TabsTrigger>
+        </TabsList>
 
-      {selected.size > 0 && (
-        <div className="flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm">
-          <span className="font-medium">{selected.size} selected</span>
-          <Button variant="destructive" size="sm" onClick={() => setBulkDeleteOpen(true)}>
-            <Trash2 className="size-3.5" />
-            Delete Selected
-          </Button>
-          <button
-            type="button"
-            className="ml-auto text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => setSelected(new Set())}
-          >
-            Clear
-          </button>
-        </div>
-      )}
-
-      {query.isLoading ? (
-        <div className="flex flex-col gap-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full" />
-          ))}
-        </div>
-      ) : items.length === 0 ? (
-        <EmptyState active={active} />
-      ) : (
-        <>
-          {/* Desktop / tablet table */}
-          <div className="hidden overflow-hidden rounded-xl border border-border bg-card md:block">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-10">
-                    <Checkbox
-                      checked={selected.size > 0 && selected.size === items.length}
-                      onCheckedChange={toggleSelectAll}
-                      aria-label="Select all"
-                    />
-                  </TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                  <TableHead>Stock</TableHead>
-                  <TableHead>Valid Until</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((product) => (
-                  <ProductRow
-                    key={product.id}
-                    product={product}
-                    selected={selected.has(product.id)}
-                    onToggleSelect={() => toggleSelect(product.id)}
-                    onDelete={() => setDeleteTarget(product)}
-                    onGenerateImage={() => handleGenerateImage(product)}
-                  />
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Mobile cards */}
-          <div className="flex flex-col gap-3 md:hidden">
-            {items.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                selected={selected.has(product.id)}
-                onToggleSelect={() => toggleSelect(product.id)}
-                onDelete={() => setDeleteTarget(product)}
-                onGenerateImage={() => handleGenerateImage(product)}
+        <TabsContent value="all" className="mt-5 flex flex-col gap-5">
+          <div className="flex flex-col gap-3">
+            <AiSearchBar
+              onSearch={handleSearch}
+              onClear={handleClearSearch}
+              loading={aiSearch.isPending}
+              active={active}
+            />
+            {active && aiFilter && aiMeta ? (
+              <FilterChips
+                filter={aiFilter}
+                source={aiMeta.source}
+                explanation={aiMeta.explanation}
+                onRemove={handleRemoveChip}
+                onClear={handleClearSearch}
               />
-            ))}
+            ) : (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span>Try:</span>
+                {SEARCH_QUERIES.map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => handleSearch(q)}
+                    className="rounded-full border border-border px-2.5 py-1 font-medium text-foreground outline-none transition-colors hover:border-primary/40 hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <span>
-              Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
-            </span>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
-                Previous
+          {selected.size > 0 && (
+            <div className="flex items-center gap-3 rounded-md border border-primary/30 bg-primary/5 px-4 py-2 text-sm">
+              <span className="font-medium">{selected.size} selected</span>
+              <Button variant="destructive" size="sm" onClick={() => setBulkDeleteOpen(true)}>
+                <Trash2 />
+                Delete Selected
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages - 1}
-                onClick={() => setPage((p) => p + 1)}
+              <button
+                type="button"
+                className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setSelected(new Set())}
               >
-                Next
-              </Button>
+                Clear
+              </button>
             </div>
+          )}
+
+          {query.isLoading ? (
+            <LoadingState />
+          ) : query.isError ? (
+            <ErrorState onRetry={() => query.refetch()} />
+          ) : items.length === 0 ? (
+            <EmptyState active={active} />
+          ) : (
+            <ProductCollection
+              {...collectionProps}
+              sort={sort}
+              onSortChange={changeSort}
+              selection={{
+                selected,
+                onToggleSelect: toggleSelect,
+                onToggleSelectAll: toggleSelectAll,
+              }}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="expired" className="mt-5 flex flex-col gap-5">
+          <div className="flex items-start gap-2 rounded-md border border-border bg-secondary/40 px-4 py-2.5 text-sm text-muted-foreground">
+            <CalendarX className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <span>
+              These products are past their validity date and are hidden from listings, search, and export.
+              Open one to update its dates and bring it back.
+            </span>
           </div>
-        </>
-      )}
+
+          {expired.isLoading ? (
+            <LoadingState />
+          ) : expired.isError ? (
+            <ErrorState onRetry={() => expired.refetch()} />
+          ) : items.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-border bg-secondary/30 px-6 py-16 text-center">
+              <span className="flex size-12 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+                <CalendarX className="size-5" />
+              </span>
+              <p className="text-sm text-muted-foreground">No expired products. Nice.</p>
+            </div>
+          ) : (
+            <ProductCollection {...collectionProps} />
+          )}
+        </TabsContent>
+      </Tabs>
 
       <DeleteConfirmDialog
         open={!!deleteTarget}
@@ -276,16 +308,43 @@ export function ProductsListPage() {
         loading={deleteProduct.isPending}
         onConfirm={handleBulkDelete}
       />
+
+      <ProductPeek product={peekTarget} onOpenChange={(open) => !open && setPeekTarget(null)} />
+    </div>
+  )
+}
+
+function LoadingState() {
+  return (
+    <div className="overflow-hidden rounded-lg border border-border bg-card">
+      <div className="border-b border-border p-3">
+        <Skeleton className="h-4 w-40" />
+      </div>
+      <div className="flex flex-col divide-y divide-border">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 p-3">
+            <Skeleton className="size-10 shrink-0 rounded-md" />
+            <div className="flex flex-1 flex-col gap-2">
+              <Skeleton className="h-4 w-1/3" />
+              <Skeleton className="h-3 w-1/4" />
+            </div>
+            <Skeleton className="h-6 w-16 shrink-0" />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
 
 function EmptyState({ active }: { active: boolean }) {
+  const Icon = active ? PackageSearch : PackageX
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border py-16 text-center">
-      {active ? <PackageSearch className="size-8 text-muted-foreground" /> : <PackageX className="size-8 text-muted-foreground" />}
-      <div>
-        <p className="font-medium">{active ? 'Nothing matched' : 'No products yet'}</p>
+    <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-border bg-secondary/30 px-6 py-16 text-center">
+      <span className="flex size-12 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+        <Icon className="size-5" />
+      </span>
+      <div className="flex flex-col gap-1">
+        <p className="font-medium">{active ? 'No matching products' : 'No products yet'}</p>
         <p className="text-sm text-muted-foreground">
           {active ? 'Try removing a filter or searching for something else.' : 'Create your first product to get started.'}
         </p>
@@ -298,6 +357,24 @@ function EmptyState({ active }: { active: boolean }) {
           </Link>
         </Button>
       )}
+    </div>
+  )
+}
+
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-destructive/30 bg-destructive/5 px-6 py-16 text-center">
+      <span className="flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+        <AlertTriangle className="size-5" />
+      </span>
+      <div className="flex flex-col gap-1">
+        <p className="font-medium">Couldn't load products</p>
+        <p className="text-sm text-muted-foreground">Something went wrong while fetching your catalog.</p>
+      </div>
+      <Button variant="outline" onClick={onRetry}>
+        <RotateCcw />
+        Try again
+      </Button>
     </div>
   )
 }
