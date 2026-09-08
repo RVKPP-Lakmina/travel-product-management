@@ -4,10 +4,13 @@ import type {
   CreateProductInput,
   UpdateProductInput,
   ProductQuery,
+  ExpiredQuery,
   ProductResponse,
   DashboardStats,
+  ProductAnalytics,
   SearchFilter,
 } from '@travel/validation';
+import { productAnalyticsSchema } from '@travel/validation';
 import { SUPABASE_CLIENT } from '../common/supabase/supabase.constants.js';
 import { toProductResponse } from './mappers.js';
 import { productQueryToFilter, runProductQuery } from './query-compiler.js';
@@ -33,6 +36,9 @@ export class ProductsService {
         highlights: input.highlights,
         inclusions: input.inclusions,
         tags: input.tags,
+        // Cosmetic provenance hint, and the one create field that DOES come
+        // from the body (see migration 0006 / product.schema.ts).
+        ai_generated: input.aiGenerated,
         // created_by is NEVER taken from the request body — it isn't even
         // in createProductSchema. It comes exclusively from the verified
         // JWT subject via @CurrentUser().
@@ -119,6 +125,27 @@ export class ProductsService {
     if (!data) throw new NotFoundException('Product not found');
   }
 
+  /**
+   * Browse the rows `products_listable` hides. Reads `products_expired`
+   * (0007) directly — a separate, narrow path that the AI search compiler
+   * never touches, so the "can't accidentally read expired rows" invariant
+   * in query-compiler.ts stays intact. Sort is fixed to most-recently-
+   * expired first; the only optional slice is by category.
+   */
+  async findExpired(query: ExpiredQuery): Promise<{ items: ProductResponse[]; total: number }> {
+    let q = this.supabase
+      .from('products_expired')
+      .select('*', { count: 'exact' })
+      .order('valid_until', { ascending: false })
+      .range(query.offset, query.offset + query.limit - 1);
+
+    if (query.category) q = q.eq('category', query.category);
+
+    const { data, error, count } = await q;
+    if (error) throw error;
+    return { items: (data ?? []).map((r) => toProductResponse(r as ProductRow)), total: count ?? 0 };
+  }
+
   /** Reads the base table via RPC — expired rows stay countable even though they're not listable. */
   async dashboardStats(): Promise<DashboardStats> {
     const { data, error } = await this.supabase.rpc('dashboard_stats').single();
@@ -130,6 +157,20 @@ export class ProductsService {
       expired: row.expired,
       inactive: row.inactive,
     };
+  }
+
+  /**
+   * The Analytics page read model — one jsonb payload from
+   * `product_analytics()` (migration 0008), over the BASE table so expired
+   * rows are counted. Zod-parsed here (not an `as` cast like elsewhere in
+   * this file) precisely because the payload is hand-built JSON in SQL: a
+   * mistyped jsonb key should fail loudly at the boundary, not surface as
+   * `undefined` inside a chart.
+   */
+  async analytics(): Promise<ProductAnalytics> {
+    const { data, error } = await this.supabase.rpc('product_analytics');
+    if (error) throw error;
+    return productAnalyticsSchema.parse(data);
   }
 
   /**
