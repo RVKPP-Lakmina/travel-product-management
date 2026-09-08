@@ -41,6 +41,12 @@ services:
       # host's. host.docker.internal is what actually reaches a locally
       # running `supabase start` stack. Same reasoning as compose.prod.yml.
       SUPABASE_URL: ${API_SUPABASE_URL:-http://host.docker.internal:54321}
+      # The browser signs in against 127.0.0.1:54321 (apps/web/.env's
+      # VITE_SUPABASE_URL), so tokens carry iss=http://127.0.0.1:54321/auth/v1
+      # -- which won't match the host.docker.internal URL above. Pin the
+      # issuer to what the browser actually uses. Set API_SUPABASE_ISSUER
+      # (and API_SUPABASE_URL) when pointing at a hosted Supabase instead.
+      SUPABASE_JWT_ISSUER: ${API_SUPABASE_ISSUER:-http://127.0.0.1:54321/auth/v1}
       # pnpm runs non-interactively here -- never prompt before reconciling
       # node_modules against the lockfile, just do it.
       CI: "true"
