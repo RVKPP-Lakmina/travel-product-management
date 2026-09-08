@@ -237,3 +237,17 @@ values
    array['Festival pass'],
    array['galle', 'literary festival', 'cultural'],
    '00000000-0000-0000-0000-000000000001');
+
+-- ---------------------------------------------------------------------------
+-- Flag a few rows as AI-generated so the provenance sparkle (product list /
+-- dashboard) has something to render on a fresh clone. ai_generated defaults
+-- to false, so an explicit UPDATE is simpler than re-threading the column
+-- through 21 VALUES rows.
+-- ---------------------------------------------------------------------------
+update public.products
+set ai_generated = true
+where name in (
+  'Sigiriya Rock Fortress Dawn Private Tour',
+  'Yala National Park VIP Leopard Safari',
+  'Ella to Kandy Scenic Train Transfer'
+);
