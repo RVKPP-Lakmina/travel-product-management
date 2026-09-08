@@ -16,8 +16,15 @@ services:
       - ../apps/api/.env
     environment:
       NODE_ENV: production
+      # Overrides apps/api/.env's SUPABASE_URL when running against a
+      # LOCAL `supabase start` stack: 127.0.0.1 inside this container is
+      # the container's own loopback, not the host's -- host.docker.internal
+      # is what actually reaches the host machine. Has no effect (and isn't
+      # needed) once SUPABASE_URL points at a real hosted Supabase project.
       SUPABASE_URL: ${API_SUPABASE_URL:-http://host.docker.internal:54321}
     extra_hosts:
+      # host-gateway makes host.docker.internal resolve on Linux too, not
+      # just Docker Desktop (Windows/Mac), where it already works natively.
       - host.docker.internal:host-gateway
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
@@ -25,6 +32,9 @@ services:
       timeout: 5s
       start_period: 10s
       retries: 3
+    # No host port published -- only nginx (below) is externally reachable.
+    # The web container reaches this one over the compose network at
+    # http://api:3000 (see docker/nginx/default.conf's proxy_pass).
     expose:
       - "3000"
 
@@ -34,6 +44,13 @@ services:
       dockerfile: apps/web/Dockerfile
       target: production
       args:
+        # Baked into the JS bundle at build time (Vite inlines VITE_* at
+        # build, not runtime) -- these three ARE meant to be public, see
+        # apps/web/.env.example. VITE_API_URL stays relative (/api) so
+        # nginx's same-origin proxy handles it; the Supabase values default
+        # to a local `supabase start` stack reachable from the BROWSER
+        # (which runs on the host, unlike the api container above -- hence
+        # 127.0.0.1 here vs host.docker.internal there).
         VITE_API_URL: /api
         VITE_SUPABASE_URL: ${WEB_SUPABASE_URL:-http://127.0.0.1:54321}
         VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY:?set this to your Supabase publishable/anon key}
