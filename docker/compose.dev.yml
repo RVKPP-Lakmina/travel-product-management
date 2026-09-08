@@ -77,8 +77,8 @@ services:
       CI: "true"
       # The browser runs on the host, so the API it calls is the published
       # host port. Overrides apps/web/.env in case that was edited for a
-      # non-Docker setup.
-      VITE_API_URL: http://localhost:3000/api
+      # non-Docker setup. /v1 = URI versioning (see apps/api/src/main.ts).
+      VITE_API_URL: http://localhost:3000/api/v1
     command: pnpm --filter web dev --host 0.0.0.0
 
 volumes:
