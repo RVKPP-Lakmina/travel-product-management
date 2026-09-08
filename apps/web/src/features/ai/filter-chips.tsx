@@ -57,7 +57,7 @@ export function FilterChips({ filter, source, explanation, onRemove, onClear }: 
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         {source === 'ai' ? (
-          <Sparkles className="size-3.5 shrink-0 text-amber-500" />
+          <Sparkles className="size-4 shrink-0 text-amber-500" aria-hidden="true" />
         ) : (
           <span className="size-1.5 shrink-0 rounded-full bg-muted-foreground" aria-hidden="true" />
         )}
@@ -71,16 +71,16 @@ export function FilterChips({ filter, source, explanation, onRemove, onClear }: 
               key={chip.label}
               type="button"
               onClick={() => onRemove(chip.patch)}
-              className="group flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/5 py-1 pl-3 pr-2 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+              className="group flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/5 py-1 pl-3 pr-2 text-xs font-medium text-primary outline-none transition-colors hover:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring"
             >
               {chip.label}
-              <X className="size-3 opacity-60 group-hover:opacity-100" />
+              <X className="size-3 opacity-60 group-hover:opacity-100" aria-hidden="true" />
             </button>
           ))}
           <button
             type="button"
             onClick={onClear}
-            className="rounded-full px-2.5 py-1 text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            className="rounded-full px-2.5 py-1 text-xs font-medium text-muted-foreground underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring"
           >
             Clear all
           </button>
