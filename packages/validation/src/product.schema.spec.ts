@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createProductSchema, updateProductSchema, productQuerySchema } from './product.schema.js';
+import {
+  createProductSchema,
+  updateProductSchema,
+  productQuerySchema,
+  expiredQuerySchema,
+} from './product.schema.js';
 
 const validProduct = {
   name: 'Test Product',
@@ -60,6 +65,11 @@ describe('createProductSchema', () => {
     expect(result.highlights).toEqual([]);
     expect(result.tags).toEqual([]);
   });
+
+  it('defaults aiGenerated to false but accepts an explicit value', () => {
+    expect(createProductSchema.parse(validProduct).aiGenerated).toBe(false);
+    expect(createProductSchema.parse({ ...validProduct, aiGenerated: true }).aiGenerated).toBe(true);
+  });
 });
 
 describe('updateProductSchema', () => {
@@ -93,5 +103,18 @@ describe('productQuerySchema', () => {
   it('clamps limit at the schema boundary', () => {
     const result = productQuerySchema.safeParse({ limit: 9999 });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('expiredQuerySchema', () => {
+  it('applies limit/offset defaults and allows no filter', () => {
+    const result = expiredQuerySchema.parse({});
+    expect(result.limit).toBe(20);
+    expect(result.offset).toBe(0);
+    expect(result.category).toBeUndefined();
+  });
+
+  it('rejects an unknown category', () => {
+    expect(expiredQuerySchema.safeParse({ category: 'nope' }).success).toBe(false);
   });
 });
