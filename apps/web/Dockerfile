@@ -1,7 +1,14 @@
 # syntax=docker/dockerfile:1
+# check=skip=SecretsUsedInArgOrEnv
+
+# SecretsUsedInArgOrEnv is skipped above: the VITE_SUPABASE_* build args are
+# the anon/publishable Supabase values — public by design, meant to ship in
+# the browser bundle (RLS protects the key, not secrecy of it — see
+# apps/web/.env.example and supabase/migrations/20260908000002_rls.sql).
+# BuildKit's lint can't tell that from a real secret by name.
 
 # ----------------------------------------------------------------------------
-# base -- shared manifest-only layer, mirrors apps/api/Dockerfile's pattern.
+# base -- shared manifest-only layer, same pattern as apps/api/Dockerfile.
 # ----------------------------------------------------------------------------
 FROM node:22-alpine AS base
 RUN corepack enable
@@ -15,7 +22,7 @@ COPY packages/typescript-config/package.json packages/typescript-config/package.
 COPY packages/eslint-config/package.json packages/eslint-config/package.json
 
 # ----------------------------------------------------------------------------
-# development -- unchanged: bind-mounted by docker/compose.dev.yml.
+# development -- bind-mounted by docker/compose.dev.yml.
 # ----------------------------------------------------------------------------
 FROM base AS development
 COPY . .
@@ -39,12 +46,6 @@ COPY . .
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @travel/validation build
 
-# `docker build` prints a generic "SecretsUsedInArgOrEnv" lint warning on
-# VITE_SUPABASE_PUBLISHABLE_KEY below -- that's a false positive here. This
-# key is PUBLIC BY DESIGN (it's the anon/publishable key, meant to ship in
-# a browser bundle; Row Level Security is what actually protects it -- see
-# supabase/migrations/20260908000002_rls.sql and apps/web/.env.example).
-# The linter can't distinguish that from an actual secret by name alone.
 ARG VITE_API_URL=/api/v1
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_PUBLISHABLE_KEY
