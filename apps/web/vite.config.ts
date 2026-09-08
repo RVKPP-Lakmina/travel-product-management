@@ -26,6 +26,10 @@ export default defineConfig({
           if (!id.includes('node_modules')) return undefined
           if (/react(-dom|-router)?\//.test(id)) return 'react'
           if (id.includes('@radix-ui')) return 'radix'
+          // recharts + its d3-* deps — only pulled in by the lazily-loaded
+          // /analytics route, so keep it in its own chunk out of the
+          // initial bundle.
+          if (/recharts|d3-|victory-vendor|internmap/.test(id)) return 'charts'
           if (/@tanstack|@supabase|react-hook-form|\bzod\b/.test(id)) return 'vendor'
           return undefined
         },
