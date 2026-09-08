@@ -1,11 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module.js';
 
 describe('AppController (e2e)', () => {
-  let app: INestApplication<App>;
+  // NB: not `INestApplication<App>` — the installed supertest@7.2.2 ships no
+  // `exports` map, so `supertest/types` isn't resolvable under this repo's
+  // moduleResolution: nodenext + resolvePackageJsonExports: true.
+  let app: INestApplication;
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
