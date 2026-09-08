@@ -56,19 +56,31 @@ supabase db reset   # applies migrations/ + seed.sql
 # 2. Copy env files and fill in the Supabase keys `supabase start` printed
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env
+cp docker/.env.example docker/.env
 # apps/api/.env needs: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-# apps/web/.env needs: VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY
-# Both need a real OPENAI_API_KEY to exercise the AI features live —
+# apps/web/.env and docker/.env need: VITE_SUPABASE_PUBLISHABLE_KEY
+# (docker/.env supplies build-time args to `docker compose build` —
+# separate from apps/*/.env, which are loaded at container runtime)
+# All three need a real OPENAI_API_KEY to exercise the AI features live —
 # without one, generation/image endpoints return a clear error and AI
 # search gracefully falls back to keyword matching (see below).
 
 # 3. Build and run
-export VITE_SUPABASE_PUBLISHABLE_KEY=<your publishable key>
-docker compose -f docker/compose.prod.yml up --build
+pnpm docker:prod
 ```
 
-Open **http://localhost** — log in with the seeded demo account
+`pnpm docker:prod` builds both images, starts the stack, waits for it to
+actually respond, and prints the URL to open — no manual `docker compose`
+invocation, no port-guessing. Log in with the seeded demo account
 (`demo@travel.local` / `DemoPassword123!`).
+
+| Command | What it does |
+|---|---|
+| `pnpm docker:prod` | Build + start the production stack (nginx + api), print the URL |
+| `pnpm docker:prod:logs` | Tail logs from both containers |
+| `pnpm docker:prod:down` | Stop and remove the containers |
+| `pnpm docker:dev` | Build + start the dev stack (hot-reloading Nest + Vite) |
+| `pnpm docker:dev:logs` / `pnpm docker:dev:down` | Same, for the dev stack |
 
 > **Local-Docker-testing caveat, not a production issue:** the API
 > container reaches your locally-running Supabase stack via
@@ -200,6 +212,8 @@ supabase/
 docker/
   compose.dev.yml / compose.prod.yml
   nginx/        reverse proxy + security headers
+scripts/
+  docker-up.mjs   build/start/wait-for-ready wrapper behind `pnpm docker:*`
 .github/workflows/ci.yml
 ```
 
