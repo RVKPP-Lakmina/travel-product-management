@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1
+
 # ----------------------------------------------------------------------------
 # base -- shared manifest-only layer, mirrors apps/api/Dockerfile's pattern.
 # ----------------------------------------------------------------------------
@@ -25,12 +26,25 @@ CMD ["pnpm", "dev", "--host", "0.0.0.0"]
 
 # ----------------------------------------------------------------------------
 # build -- compiles @travel/validation, then the Vite production bundle.
+#
+# VITE_* values are build ARGs, not runtime env vars -- Vite inlines
+# `import.meta.env.VITE_*` into the JS bundle at build time, so there is no
+# "set it at container start" option. `VITE_API_URL` defaults to `/api`
+# (relative), which is what makes nginx's same-origin reverse proxy (see
+# docker/nginx/default.conf) work without the browser needing to know the
+# API's real host at all.
 # ----------------------------------------------------------------------------
 FROM base AS build
 COPY . .
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @travel/validation build
 
+# `docker build` prints a generic "SecretsUsedInArgOrEnv" lint warning on
+# VITE_SUPABASE_PUBLISHABLE_KEY below -- that's a false positive here. This
+# key is PUBLIC BY DESIGN (it's the anon/publishable key, meant to ship in
+# a browser bundle; Row Level Security is what actually protects it -- see
+# supabase/migrations/20260908000002_rls.sql and apps/web/.env.example).
+# The linter can't distinguish that from an actual secret by name alone.
 ARG VITE_API_URL=/api
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_PUBLISHABLE_KEY
