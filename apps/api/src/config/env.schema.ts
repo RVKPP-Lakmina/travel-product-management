@@ -24,6 +24,14 @@ export const envSchema = z.object({
   SUPABASE_URL: z.url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
   SUPABASE_STORAGE_BUCKET: z.string().min(1).default('product-images'),
+  // The `iss` claim to require on user JWTs. Defaults to
+  // `${SUPABASE_URL}/auth/v1`. Only needs setting when the URL the API uses
+  // to REACH Supabase differs from the URL the BROWSER used to sign in —
+  // e.g. Docker, where the API talks to host.docker.internal:54321 but the
+  // token was minted with iss=http://127.0.0.1:54321/auth/v1. An empty
+  // value (a bare `SUPABASE_JWT_ISSUER=` in an env file) is treated as unset.
+  SUPABASE_JWT_ISSUER: z
+    .preprocess((v) => (v === '' ? undefined : v), z.url().optional()),
 
   // ── OpenAI (server-only, used from Phase 3 onward) ──
   OPENAI_API_KEY: z.string().min(10),
