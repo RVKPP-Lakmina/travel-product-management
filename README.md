@@ -1,159 +1,212 @@
-# Turborepo starter
+# Travel Product Management System
 
-This Turborepo starter is maintained by the Turborepo core team.
+An AI-assisted travel product catalog: create, search, and manage travel
+products (tours, dining, transport, and more) with natural-language product
+generation and natural-language search, built on a NestJS API, a React SPA,
+and Supabase Postgres.
 
-## Using this example
+Built against [the spec](./AI%20Travel%20Product%20Management%20System.pdf)
+— this README covers what a reviewer needs: what it is, how to run it, and
+the decisions worth explaining.
 
-Run the following command:
+## Architecture
 
-```sh
-npx create-turbo@latest
+```
+                         Browser
+                            │
+                 ┌──────────┴──────────┐
+                 │   nginx (port 80)   │  static SPA + reverse proxy
+                 └──────────┬──────────┘
+                            │ same-origin /api/* proxy
+                 ┌──────────┴──────────┐
+                 │   NestJS API        │  auth guard · validation · throttling
+                 │   (apps/api)        │
+                 └────┬───────────┬────┘
+                      │           │
+              ┌───────┘           └───────┐
+              ▼                           ▼
+      Supabase Postgres              OpenAI API
+      (service_role client,          (structured outputs:
+       RLS as defense in depth)       generation, search, images)
 ```
 
-## What's inside?
+- **`apps/web`** — React 19 + Vite + Tailwind v4 + shadcn-style components.
+  Talks to the API over HTTP and to Supabase Auth directly (nothing else —
+  all product data goes through the API).
+- **`apps/api`** — NestJS 12, ESM. Owns every read/write of product data via
+  a `service_role` Supabase client; verifies user identity locally via
+  Supabase's JWKS endpoint (no round-trip to Supabase per request).
+- **`packages/validation`** — zod schemas shared by both apps and by the
+  AI layer's OpenAI structured-output contracts — one source of truth for
+  what a "product" is, enforced identically whether the data came from a
+  form, an AI draft, or a direct API call.
+- **`supabase/migrations`** — the database schema, RLS policies, the
+  validity-filtered view, and the dashboard RPC. `supabase/seed.sql` seeds
+  ~20 demo products (several deliberately expired) plus a demo login.
 
-This Turborepo includes the following packages/apps:
+## Quick start
 
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `@next/eslint-plugin-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+### Option A — Docker (recommended, no local Node/pnpm needed)
 
 ```sh
-cd my-turborepo
-turbo build
+# 1. Start a local Supabase stack (needs the Supabase CLI + Docker)
+supabase start
+supabase db reset   # applies migrations/ + seed.sql
+
+# 2. Copy env files and fill in the Supabase keys `supabase start` printed
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env
+# apps/api/.env needs: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+# apps/web/.env needs: VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY
+# Both need a real OPENAI_API_KEY to exercise the AI features live —
+# without one, generation/image endpoints return a clear error and AI
+# search gracefully falls back to keyword matching (see below).
+
+# 3. Build and run
+export VITE_SUPABASE_PUBLISHABLE_KEY=<your publishable key>
+docker compose -f docker/compose.prod.yml up --build
 ```
 
-Without global `turbo`, use your package manager:
+Open **http://localhost** — log in with the seeded demo account
+(`demo@travel.local` / `DemoPassword123!`).
+
+> **Local-Docker-testing caveat, not a production issue:** the API
+> container reaches your locally-running Supabase stack via
+> `host.docker.internal` (127.0.0.1 inside a container is the container's
+> own loopback, not your host's — see the comments in `docker/compose.dev.yml`
+> and `docker/compose.prod.yml`). Because of that, a JWT your browser
+> obtains from `http://127.0.0.1:54321` carries that as its `iss` claim,
+> which won't match what the containerized API expects when it reaches the
+> *same* local instance via a different hostname — so a **fully
+> authenticated round trip through the Dockerized API against a local
+> Supabase CLI stack will 401 on token verification**, even though every
+> other part of the stack (routing, headers, unauthenticated endpoints,
+> the build itself) works exactly as in production. This is purely an
+> artifact of one physical machine wearing two different hostnames in two
+> different network namespaces at once. Against a **real hosted Supabase
+> project** (the actual target for `compose.prod.yml`), there is only ever
+> one canonical URL, reachable identically from the browser and the API —
+> this gap does not exist there. For full local authenticated testing today,
+> use Option B below.
+
+### Option B — Local (pnpm), for full local testing
 
 ```sh
-cd my-turborepo
-npx turbo build
-pnpm exec turbo build
-pnpm exec turbo build
+pnpm install
+supabase start && supabase db reset
+cp apps/api/.env.example apps/api/.env   # fill in SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OPENAI_API_KEY
+cp apps/web/.env.example apps/web/.env   # fill in VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY
+
+pnpm --filter @travel/validation build
+pnpm --filter api start:dev    # http://localhost:3000
+pnpm --filter web dev          # http://localhost:5173
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+Everything runs directly on the host here, so there's no container-vs-host
+hostname split — `127.0.0.1` means the same thing everywhere.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+### Running the test suite
 
 ```sh
-turbo build --filter=docs
+pnpm turbo run build check-types lint test
 ```
 
-Without global `turbo`:
+77 API tests + 29 shared-schema tests, including frozen-clock date-boundary
+tests, mocked-OpenAI tests for every AI failure mode (timeout, refusal,
+schema-violation, injected-instruction), and query-compiler tests that
+assert which PostgREST methods fire (the mechanism that proves the
+injection-safety claims below, without needing a live database).
 
-```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+## What's implemented
+
+**Core (spec requirements 1–5):** full product CRUD; a natural-language
+"describe your product" box that drafts a product via OpenAI structured
+outputs; a natural-language search box; automatic hiding of expired
+products from listing/search (never from direct access — see
+[Product validity](#product-validity)); a dashboard with Total/Active/Expired
+counts.
+
+**Bonus:** AI product-image generation (`gpt-image-1`, stored in Supabase
+Storage); a responsive UI (table → cards below `md`, a bottom-sheet AI
+dialog below `sm`); Excel export respecting the active filter; a
+Docker Compose deployment with an nginx reverse proxy in front.
+
+## Security controls
+
+| Concern | Control |
+|---|---|
+| Prompt injection | Static system prompts (never interpolate user text into them); untrusted input delimited and marker-forgery-stripped (`apps/api/src/ai/sanitize.ts`); OpenAI strict Structured Outputs constrain the model's entire output to a closed schema — an injected instruction has no field to express itself in; zero tools/function-calling surface |
+| Model output → query | AI search never produces SQL or a query string — only a validated `SearchFilter` object, compiled by the same code path plain listing uses (`apps/api/src/products/query-compiler.ts`) |
+| PostgREST injection | Multi-value matching uses `.in()`, never string-built `.or()`/`.filter()`; keyword search uses `websearch_to_tsquery`, which never throws and treats operators as literal terms |
+| AuthN | Supabase JWT verified locally via JWKS (`jose`, asymmetric — the API never holds signing capability), not the legacy shared HS256 secret; default-deny global guard |
+| AuthZ | Mutations re-check `created_by = current user` in the query itself; a mismatch is a 404, not a 403 (no enumeration oracle) |
+| RLS | Enabled on every table even though the API's `service_role` key bypasses it — it's what protects the public anon/publishable key's direct-to-PostgREST path (see `supabase/migrations/0002_rls.sql`) |
+| Secrets | `VITE_`-prefixed values are the only ones in `apps/web` (statically inlined at build time — anything else is `undefined` in the browser); CI greps both source and the built bundle for a leaked server-only secret |
+| Input validation | Every request body validated by a zod `strictObject` — unknown fields are **rejected**, not silently stripped (a client-supplied `createdBy` is a 400, not a no-op) |
+| Rate limiting | Per-route named throttler buckets (`ai`: 10/min, `image`: 5/5min, `default`: 100/min), plus a separate daily-quota table independent of the per-minute buckets (stops a slow-drip cost attack) |
+| HTTP hardening | `helmet` on the API; a real CSP, HSTS, and `X-Frame-Options` on nginx (not just documented — verified by an actual header dump against the built image, see `docker/nginx/` comments for the add_header-inheritance pitfall that first broke this) |
+| Export safety | Any cell value starting with `=+-@` is prefixed with `'` (CSV/Excel formula-injection defense) |
+| Supply chain | One lockfile, `--frozen-lockfile` in CI, lifecycle scripts blocked by default (pnpm), CI actions pinned to commit SHAs, non-root containers, multi-stage builds with a pruned production `node_modules` |
+
+## Product validity
+
+A product is "expired" purely from `valid_until < today (Asia/Colombo)` —
+independent of the `status` field. This is enforced in exactly one place,
+`products_listable` (a Postgres view), which every list/search/export read
+goes through — not repeated `WHERE` clauses scattered across query
+builders, which is exactly the kind of thing an AI-search code path would
+be first to forget. `GET /products/:id` deliberately reads the *base*
+table instead, so an expired product can still be opened and corrected;
+the UI shows an "Expired" warning banner in that case.
+
+**Total ≠ Active + Expired + Inactive** on the dashboard — status and
+expiry are orthogonal (an inactive product can also be expired). See the
+info note under the dashboard tiles.
+
+## Notable design decisions
+
+- **No pgvector.** The LLM already does the semantic work by normalizing a
+  query into structured fields (destination, category, price range); the
+  database only needs lexical matching on already-disambiguated terms,
+  which `tsvector` + GIN handles exactly and instantly for a catalog this
+  size. Embeddings would double AI latency on the search hot path for no
+  benefit until the catalog is far larger or queries turn genuinely
+  vibe-based ("somewhere romantic for an anniversary") rather than
+  noun-based, which the spec's own example queries are not.
+- **Image generation is synchronous**, not a queued job. `gpt-image-1` at
+  low quality is ~5–15s; a BullMQ+Redis queue is real infrastructure for
+  one bonus feature on a 24-hour assessment. At production scale this
+  becomes a queued job + webhook.
+- **AI search always degrades, never fails** — a heuristic keyword/regex
+  fallback (`apps/api/src/ai/search/heuristic-fallback.ts`, zero external
+  dependencies) covers every one of the spec's example queries and kicks
+  in on any OpenAI timeout, refusal, or schema-violating response, so an
+  API outage never turns into a 500 for the end user.
+- **RLS style-src `'unsafe-inline'`** on the nginx CSP is a known, bounded
+  relaxation — React inline styles and Radix's positioning logic set the
+  `style` attribute directly. `script-src` has no such relaxation.
+
+## Repository layout
+
+```
+apps/
+  api/      NestJS API — feature folders (products/, ai/, health/, common/)
+  web/      React SPA — feature folders (features/products, features/ai, ...)
+packages/
+  validation/   shared zod schemas (the AI wire contracts + the DB row shape)
+supabase/
+  migrations/   schema, RLS, the validity view, storage policies
+  seed.sql      demo data
+docker/
+  compose.dev.yml / compose.prod.yml
+  nginx/        reverse proxy + security headers
+.github/workflows/ci.yml
 ```
 
-### Develop
+## Submission checklist
 
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+- [x] Source code
+- [x] Database script — `supabase/migrations/` + `supabase/seed.sql`
+- [x] README with setup instructions — this file
+- [x] `.env.example` without real keys — `apps/api/.env.example`,
+      `apps/web/.env.example`
