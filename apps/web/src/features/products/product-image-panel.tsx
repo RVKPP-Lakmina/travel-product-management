@@ -1,6 +1,7 @@
 import { ImagePlus, RefreshCw, Sparkles, AlertTriangle } from 'lucide-react'
 import { useGenerateProductImage } from './hooks'
 import { Button } from '@/components/ui/button'
+import { AiBadge } from '@/features/ai/ai-badge'
 import { ApiError } from '@/lib/api'
 import { toast } from 'sonner'
 
@@ -23,15 +24,13 @@ export function ProductImagePanel({ productId, imageUrl }: ProductImagePanelProp
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">AI Visual Studio</h3>
-        <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-          Generative Asset
-        </span>
+    <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-5">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">Product image</h2>
+        <AiBadge />
       </div>
 
-      <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg border border-dashed border-border bg-secondary/40">
+      <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-md border border-dashed border-border bg-secondary/40">
         {generateImage.isPending ? (
           <div className="flex flex-col items-center gap-2 text-muted-foreground">
             <Sparkles className="size-6 animate-pulse text-amber-500" />
@@ -55,9 +54,21 @@ export function ProductImagePanel({ productId, imageUrl }: ProductImagePanelProp
       {!productId ? (
         <p className="text-xs text-muted-foreground">Save this product first to generate an image.</p>
       ) : (
-        <Button type="button" variant="ai" className="w-full" onClick={handleGenerate} loading={generateImage.isPending}>
-          {imageUrl || generateImage.isError ? <RefreshCw /> : <Sparkles />}
-          {imageUrl ? 'Regenerate' : 'Generate image with AI'}
+        <Button
+          type="button"
+          variant="ai"
+          className="w-full"
+          onClick={handleGenerate}
+          disabled={generateImage.isPending}
+        >
+          {generateImage.isPending ? (
+            <Sparkles className="animate-pulse" />
+          ) : imageUrl || generateImage.isError ? (
+            <RefreshCw />
+          ) : (
+            <Sparkles />
+          )}
+          {generateImage.isPending ? 'Analyzing…' : imageUrl ? 'Regenerate' : 'Generate image with AI'}
         </Button>
       )}
     </div>
