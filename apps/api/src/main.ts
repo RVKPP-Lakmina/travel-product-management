@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { VersioningType } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
@@ -50,6 +51,17 @@ async function bootstrap() {
   app.use(express.urlencoded({ limit: '100kb', extended: false }));
 
   app.setGlobalPrefix('api');
+
+  // URI versioning: every route is served under /api/v1/* by default.
+  // A future breaking change ships as v2 alongside v1 rather than mutating
+  // the existing contract under clients. Health/readiness probes opt out
+  // (VERSION_NEUTRAL in HealthController) so orchestrators keep a stable
+  // /api/health path across versions.
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: '1',
+  });
+
   app.enableShutdownHooks();
 
   await app.listen(config.port);
