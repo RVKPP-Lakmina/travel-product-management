@@ -4,70 +4,160 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ==========================================================================
+   Design tokens — see /ui-architecture.md for the rules behind these values.
+   Tailwind v4: this file IS the config. The @theme inline block below maps
+   these CSS variables to Tailwind utilities (bg-primary, text-success, …).
+   ========================================================================== */
+
 :root {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
 
-  /* Brand */
+  /* Theme native form controls (date pickers, scrollbars) to match. */
+  color-scheme: light;
+
+  /* --- Brand: Deep Teal ------------------------------------------------- */
   --color-brand-50: #f0fdfa;
   --color-brand-100: #ccfbf1;
   --color-brand-500: #14b8a6;
   --color-brand-600: #0d9488;
-  --color-brand-700: #0f766e;
+  --color-brand-700: #0f766e; /* Primary — Deep Teal */
   --color-brand-800: #115e59;
 
+  /* --- AI Accent: Warm Amber ----------------------------------------- */
   --color-amber-50: #fffbeb;
   --color-amber-100: #fef3c7;
-  --color-amber-500: #f59e0b;
+  --color-amber-500: #f59e0b; /* AI Accent — Warm Amber */
   --color-amber-600: #d97706;
   --color-amber-700: #b45309;
 
-  /* Semantic status */
-  --color-status-active: #16a34a;
-  --color-status-active-bg: #f0fdf4;
-  --color-status-expiring: #d97706;
-  --color-status-expiring-bg: #fffbeb;
-  --color-status-expired: #dc2626;
-  --color-status-expired-bg: #fef2f2;
-  --color-status-inactive: #64748b;
-  --color-status-inactive-bg: #f1f5f9;
+  /* --- Semantic hues (spec names) ------------------------------------- */
+  --success: #16a34a;
+  --success-foreground: #f0fdf4;
+  --success-bg: #f0fdf4;
+  --warning: #d97706;
+  --warning-foreground: #fffbeb;
+  --warning-bg: #fffbeb;
+  --danger: #dc2626;
+  --danger-foreground: #fef2f2;
+  --danger-bg: #fef2f2;
+  --inactive: #64748b;
+  --inactive-foreground: #ffffff;
+  --inactive-bg: #f1f5f9;
 
-  /* shadcn-style semantic tokens — light */
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  /* --- Status aliases (used by existing badge / stat-tile code) ------ */
+  --color-status-active: var(--success);
+  --color-status-active-bg: var(--success-bg);
+  --color-status-expiring: var(--warning);
+  --color-status-expiring-bg: var(--warning-bg);
+  --color-status-expired: var(--danger);
+  --color-status-expired-bg: var(--danger-bg);
+  --color-status-inactive: var(--inactive);
+  --color-status-inactive-bg: var(--inactive-bg);
+
+  /* --- shadcn semantic tokens — light ------------------------------- */
+  --background: #f8fafc; /* BG Light */
+  --foreground: #0f172a; /* Text */
   --card: #ffffff;
   --card-foreground: #0f172a;
   --popover: #ffffff;
   --popover-foreground: #0f172a;
-  --primary: #0f766e;
+  --primary: #0f766e; /* Deep Teal */
   --primary-foreground: #f0fdfa;
   --secondary: #f1f5f9;
   --secondary-foreground: #0f172a;
   --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --accent: #f59e0b;
+  --muted-foreground: #64748b; /* Inactive */
+  --accent: #f59e0b; /* Warm Amber — AI */
   --accent-foreground: #451a03;
-  --destructive: #dc2626;
+  --destructive: #dc2626; /* Danger */
   --destructive-foreground: #fef2f2;
   --border: #e2e8f0;
   --input: #e2e8f0;
   --ring: #0f766e;
-  --radius: 0.625rem;
+
+  /* --- Radius: 10px cards, 8px inputs ------------------------------- */
+  --radius: 0.625rem; /* 10px */
+  --radius-input: 0.5rem; /* 8px */
+
+  /* --- Layout ------------------------------------------------------- */
+  /* Live value is set by AppLayout (see app/sidebar-provider.tsx); this
+     fallback keeps anything rendered outside the layout sane. Custom
+     properties inherit through the DOM, so the product form's *fixed*
+     action bar tracks the rail without knowing the sidebar exists. */
+  --sidebar-w: 16rem; /* 256px */
+
+  /* --- Gradients (see /ui-architecture.md §1 — used sparingly: the brand
+     mark and the ambient login backdrop only, never on content) -------- */
+  --gradient-brand: linear-gradient(135deg, #0f766e 0%, #10b981 100%);
+  --orb-1: rgba(15, 118, 110, 0.18); /* teal */
+  --orb-2: rgba(16, 185, 129, 0.14); /* emerald */
+
+  /* --- Category tints — low-saturation wayfinding only. Amber (AI),
+     success-green and danger-red are deliberately absent; the label text
+     always carries the meaning, colour is secondary. bg / fg pairs. ---- */
+  --cat-dining-bg: #fff1f2;        --cat-dining-fg: #9f1239;
+  --cat-excursion-bg: #f0f9ff;     --cat-excursion-fg: #0369a1;
+  --cat-safari-bg: #f5f5f4;        --cat-safari-fg: #57534e;
+  --cat-accommodation-bg: #f5f3ff; --cat-accommodation-fg: #6d28d9;
+  --cat-transport-bg: #eff6ff;     --cat-transport-fg: #1d4ed8;
+  --cat-family-bg: #fdf4ff;        --cat-family-fg: #a21caf;
+  --cat-wellness-bg: #ecfeff;      --cat-wellness-fg: #0e7490;
+  --cat-cultural-bg: #eef2ff;      --cat-cultural-fg: #4338ca;
+  --cat-adventure-bg: #faf5ff;     --cat-adventure-fg: #7e22ce;
+  --cat-shopping-bg: #f8fafc;      --cat-shopping-fg: #475569;
+
+  /* --- Chart ramp — one teal hue, stepped by lightness so colour reads
+     as magnitude, not identity. Hand-tuned per theme (never color-mixed
+     toward --card, or the pale steps disappear on dark). --------------- */
+  --chart-1: #0f766e;
+  --chart-2: #0d9488;
+  --chart-3: #14b8a6;
+  --chart-4: #5eead4;
+  --chart-5: #99f6e4;
+  --chart-grid: #e2e8f0;
 }
 
 .dark {
+  color-scheme: dark;
+
+  /* --- Semantic hues — lightened for dark surfaces ------------------ */
+  --success: #4ade80;
+  --success-foreground: #052e16;
+  --success-bg: #0a2416;
+  --warning: #fbbf24;
+  --warning-foreground: #2b1c04;
+  --warning-bg: #2b1c04;
+  --danger: #f87171;
+  --danger-foreground: #450a0a;
+  --danger-bg: #2b0d0d;
+  --inactive: #94a3b8;
+  --inactive-foreground: #0b1120;
+  --inactive-bg: #1a2130;
+
+  --color-status-active: var(--success);
+  --color-status-active-bg: var(--success-bg);
+  --color-status-expiring: var(--warning);
+  --color-status-expiring-bg: var(--warning-bg);
+  --color-status-expired: var(--danger);
+  --color-status-expired-bg: var(--danger-bg);
+  --color-status-inactive: var(--inactive);
+  --color-status-inactive-bg: var(--inactive-bg);
+
+  /* --- shadcn semantic tokens — dark ------------------------------- */
   --background: #0b1120;
   --foreground: #f1f5f9;
   --card: #131b2e;
   --card-foreground: #f1f5f9;
   --popover: #131b2e;
   --popover-foreground: #f1f5f9;
-  --primary: #2dd4bf;
+  --primary: #2dd4bf; /* lighter teal for contrast on dark */
   --primary-foreground: #042f2e;
   --secondary: #1e293b;
   --secondary-foreground: #f1f5f9;
   --muted: #1e293b;
   --muted-foreground: #94a3b8;
-  --accent: #f59e0b;
+  --accent: #f59e0b; /* Warm Amber holds across themes */
   --accent-foreground: #451a03;
   --destructive: #f87171;
   --destructive-foreground: #450a0a;
@@ -75,17 +165,34 @@
   --input: #263042;
   --ring: #2dd4bf;
 
-  --color-status-active: #4ade80;
-  --color-status-active-bg: #0a2416;
-  --color-status-expiring: #fbbf24;
-  --color-status-expiring-bg: #2b1c04;
-  --color-status-expired: #f87171;
-  --color-status-expired-bg: #2b0d0d;
-  --color-status-inactive: #94a3b8;
-  --color-status-inactive-bg: #1a2130;
+  /* Brighter brand mark + stronger orbs to read against the deep bg */
+  --gradient-brand: linear-gradient(135deg, #0d9488 0%, #34d399 100%);
+  --orb-1: rgba(45, 212, 191, 0.16);
+  --orb-2: rgba(16, 185, 129, 0.12);
+
+  /* Category tints — deep, low-chroma bg + light fg for dark surfaces */
+  --cat-dining-bg: #3f1d2b;        --cat-dining-fg: #fda4af;
+  --cat-excursion-bg: #0c2a3f;     --cat-excursion-fg: #7dd3fc;
+  --cat-safari-bg: #2b2926;        --cat-safari-fg: #d6d3d1;
+  --cat-accommodation-bg: #2a1e46; --cat-accommodation-fg: #c4b5fd;
+  --cat-transport-bg: #17253f;     --cat-transport-fg: #93c5fd;
+  --cat-family-bg: #391640;        --cat-family-fg: #f0abfc;
+  --cat-wellness-bg: #0b2e37;      --cat-wellness-fg: #67e8f9;
+  --cat-cultural-bg: #22214a;      --cat-cultural-fg: #a5b4fc;
+  --cat-adventure-bg: #2f1b45;     --cat-adventure-fg: #d8b4fe;
+  --cat-shopping-bg: #232c3a;      --cat-shopping-fg: #cbd5e1;
+
+  /* Chart ramp — brightened so all five steps separate on the deep bg */
+  --chart-1: #5eead4;
+  --chart-2: #2dd4bf;
+  --chart-3: #14b8a6;
+  --chart-4: #0d9488;
+  --chart-5: #115e59;
+  --chart-grid: #263042;
 }
 
 @theme inline {
+  /* Surfaces & brand */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -106,10 +213,67 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* Category tints — utilities bg-cat-<slug>-bg / text-cat-<slug>-fg */
+  --color-cat-dining-bg: var(--cat-dining-bg);
+  --color-cat-dining-fg: var(--cat-dining-fg);
+  --color-cat-excursion-bg: var(--cat-excursion-bg);
+  --color-cat-excursion-fg: var(--cat-excursion-fg);
+  --color-cat-safari-bg: var(--cat-safari-bg);
+  --color-cat-safari-fg: var(--cat-safari-fg);
+  --color-cat-accommodation-bg: var(--cat-accommodation-bg);
+  --color-cat-accommodation-fg: var(--cat-accommodation-fg);
+  --color-cat-transport-bg: var(--cat-transport-bg);
+  --color-cat-transport-fg: var(--cat-transport-fg);
+  --color-cat-family-bg: var(--cat-family-bg);
+  --color-cat-family-fg: var(--cat-family-fg);
+  --color-cat-wellness-bg: var(--cat-wellness-bg);
+  --color-cat-wellness-fg: var(--cat-wellness-fg);
+  --color-cat-cultural-bg: var(--cat-cultural-bg);
+  --color-cat-cultural-fg: var(--cat-cultural-fg);
+  --color-cat-adventure-bg: var(--cat-adventure-bg);
+  --color-cat-adventure-fg: var(--cat-adventure-fg);
+  --color-cat-shopping-bg: var(--cat-shopping-bg);
+  --color-cat-shopping-fg: var(--cat-shopping-fg);
+
+  /* Chart ramp — utilities fill-chart-1 / text-chart-3 / stroke-chart-grid */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-grid: var(--chart-grid);
+
+  /* Semantic utilities: bg-success, text-warning, border-danger, … */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-bg: var(--success-bg);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-bg: var(--warning-bg);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-bg: var(--danger-bg);
+  --color-inactive: var(--inactive);
+  --color-inactive-foreground: var(--inactive-foreground);
+  --color-inactive-bg: var(--inactive-bg);
+
+  /* Radius — 10px cards, 8px inputs */
+  --radius-sm: calc(var(--radius) - 4px); /* 6px */
+  --radius-md: var(--radius-input); /* 8px — inputs, buttons */
+  --radius-lg: var(--radius); /* 10px — cards, dialogs */
+  --radius-xl: calc(var(--radius) + 4px); /* 14px */
+
+  /* Typography scale — size / line-height (see /ui-architecture.md) */
+  --text-display: 1.875rem; /* 30 */
+  --text-display--line-height: 2.25rem; /* 36 */
+  --text-stat: 2rem; /* 32 — dashboard stat numbers */
+  --text-stat--line-height: 2.5rem; /* 40 */
+  --text-h1: 1.5rem; /* 24 */
+  --text-h1--line-height: 2rem; /* 32 */
+  --text-h2: 1.125rem; /* 18 */
+  --text-h2--line-height: 1.75rem; /* 28 */
+  --text-body: 0.875rem; /* 14 */
+  --text-body--line-height: 1.25rem; /* 20 */
 
   --font-sans: var(--font-sans);
 }
@@ -130,5 +294,96 @@
 @layer utilities {
   .tabular-nums {
     font-variant-numeric: tabular-nums;
+  }
+
+  /* One calm entrance for a page's content. motion-reduce disables it. */
+  .page-enter {
+    animation: page-enter 260ms ease-out both;
+  }
+  @keyframes page-enter {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .page-enter {
+      animation: none;
+    }
+  }
+
+  /* Compact table density (Settings toggle → data-density on <html>). Only
+     tightens the vertical rhythm; column widths and type are untouched. */
+  :root[data-density='compact'] td {
+    padding-block: 0.375rem; /* 6px, from 8px */
+  }
+  :root[data-density='compact'] th {
+    height: 2.25rem; /* 36px, from 40px */
+  }
+
+  /* Gradient brand mark — the ONE place a gradient touches a solid shape
+     (see /ui-architecture.md §1). Everything else stays flat. */
+  .bg-gradient-brand {
+    background-image: var(--gradient-brand);
+  }
+
+  /* Ambient login backdrop. Two blurred radial orbs behind a flat card —
+     decorative only, so callers wrap this in an aria-hidden element. */
+  .login-orbs::before,
+  .login-orbs::after {
+    content: '';
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(80px);
+    pointer-events: none;
+  }
+  .login-orbs::before {
+    width: 32rem;
+    height: 32rem;
+    top: -8rem;
+    right: -6rem;
+    background: radial-gradient(circle at center, var(--orb-1), transparent 70%);
+  }
+  .login-orbs::after {
+    width: 28rem;
+    height: 28rem;
+    bottom: -10rem;
+    left: -8rem;
+    background: radial-gradient(circle at center, var(--orb-2), transparent 70%);
+  }
+  @media (max-width: 640px) {
+    .login-orbs::after {
+      display: none;
+    }
+    .login-orbs::before {
+      width: 20rem;
+      height: 20rem;
+    }
+  }
+
+  /* AI "thinking" shimmer — used by <AiThinking>. Calm amber sweep,
+     not a spinner (see /ui-architecture.md §5). */
+  .ai-shimmer {
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in oklab, var(--accent) 22%, transparent) 30%,
+      color-mix(in oklab, var(--accent) 22%, transparent) 45%,
+      transparent 75%
+    );
+    background-size: 200% 100%;
+    animation: ai-shimmer 1.4s ease-in-out infinite;
+  }
+  @keyframes ai-shimmer {
+    0% {
+      background-position: 180% 0;
+    }
+    100% {
+      background-position: -20% 0;
+    }
   }
 }
