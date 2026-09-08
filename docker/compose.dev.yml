@@ -13,6 +13,10 @@ services:
       - "3000:3000"
     env_file:
       - ../apps/api/.env
+    environment:
+      SUPABASE_URL: ${API_SUPABASE_URL:-http://host.docker.internal:54321}
+    extra_hosts:
+      - host.docker.internal:host-gateway
     command: pnpm --filter api start:dev
 
   web:
