@@ -13,8 +13,8 @@ async function bootstrap() {
 
   const config = app.get(AppConfigService);
 
-  // Mandatory behind nginx (Phase 4). Without this, every request appears
-  // to originate from the proxy's IP, which breaks both the throttler's
+  // Mandatory behind nginx. Without this, every request appears to
+  // originate from the proxy's IP, which breaks both the throttler's
   // per-client tracking and req.ip generally. `1` = trust exactly one hop
   // (the reverse proxy) — NOT `true`, which would trust an arbitrary,
   // client-spoofable X-Forwarded-For chain.
