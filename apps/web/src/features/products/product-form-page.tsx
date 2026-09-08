@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeft, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, RotateCcw } from 'lucide-react'
 import {
   createProductSchema,
   CATEGORY_SLUGS,
@@ -15,12 +15,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 import { TagListInput } from './tag-list-input'
 import { ProductImagePanel } from './product-image-panel'
+import { AiBadge } from '@/features/ai/ai-badge'
+import { AiNote } from '@/features/ai/ai-note'
 import { toast } from 'sonner'
 import { ApiError } from '@/lib/api'
 
@@ -37,19 +39,29 @@ const EMPTY_VALUES: CreateProductInput = {
   highlights: [],
   inclusions: [],
   tags: [],
+  aiGenerated: false,
 }
 
 function AiLabel({ text, isAi }: { text: string; isAi: boolean }) {
   return (
     <span className="flex items-center gap-1.5">
       {text}
-      {isAi && (
-        <Badge variant="ai" className="px-1.5 py-0 text-[10px]">
-          AI
-        </Badge>
-      )}
+      {isAi && <AiBadge />}
     </span>
   )
+}
+
+// AI-uncertain field: subtle amber ring, never a hard error ring
+// (see /ui-architecture.md §5).
+const NEEDS_INPUT_CLS = 'ring-1 ring-accent/60 bg-accent/5'
+
+function NeedsInput({ show }: { show: boolean }) {
+  if (!show) return null
+  return <p className="text-xs font-medium text-amber-600 dark:text-amber-400">Needs your input</p>
+}
+
+function SectionHeading({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <h2 className={cn('text-sm font-semibold text-foreground', className)}>{children}</h2>
 }
 
 export function ProductFormPage() {
@@ -126,6 +138,9 @@ export function ProductFormPage() {
       setValue('tags', draft.tags, { shouldDirty: true })
       applied.add('tags')
     }
+    // Provenance: this product started as an AI draft. Create-only —
+    // updateProductSchema doesn't accept it (stripped in onSubmit below).
+    if (applied.size > 0) setValue('aiGenerated', true, { shouldDirty: true })
     setAiFields(applied)
     // Only apply once — the location.state object identity is stable for
     // the lifetime of this navigation.
@@ -156,7 +171,11 @@ export function ProductFormPage() {
   async function onSubmit(values: CreateProductInput) {
     try {
       if (isEdit) {
-        await update.mutateAsync(values)
+        // aiGenerated is create-only provenance; updateProductSchema is a
+        // strictObject and rejects unknown keys.
+        const patch: Partial<CreateProductInput> = { ...values }
+        delete patch.aiGenerated
+        await update.mutateAsync(patch)
         toast.success('Product updated.')
       } else {
         const created = await create.mutateAsync(values)
@@ -175,9 +194,41 @@ export function ProductFormPage() {
 
   if (isEdit && existing.isLoading) {
     return (
-      <div className="flex flex-col gap-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-96 w-full" />
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center gap-3">
+          <Skeleton className="size-10 rounded-md" />
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <Skeleton className="h-128 w-full rounded-lg xl:col-span-2" />
+          <Skeleton className="h-80 w-full rounded-lg" />
+        </div>
+      </div>
+    )
+  }
+
+  if (isEdit && existing.isError) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-destructive/30 bg-destructive/5 px-6 py-16 text-center">
+        <span className="flex size-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+          <AlertTriangle className="size-5" />
+        </span>
+        <div className="flex flex-col gap-1">
+          <p className="font-medium">Couldn't load this product</p>
+          <p className="text-sm text-muted-foreground">It may have been deleted, or the link is wrong.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button type="button" variant="secondary" onClick={() => navigate('/products')}>
+            Back to products
+          </Button>
+          <Button type="button" variant="outline" onClick={() => existing.refetch()}>
+            <RotateCcw />
+            Try again
+          </Button>
+        </div>
       </div>
     )
   }
@@ -206,18 +257,19 @@ export function ProductFormPage() {
       )}
 
       {assumptions.length > 0 && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-          <p className="mb-1 font-medium">AI assumptions</p>
+        <AiNote title="AI assumptions">
           <ul className="list-disc space-y-0.5 pl-4">
             {assumptions.map((a) => (
               <li key={a}>{a}</li>
             ))}
           </ul>
-        </div>
+        </AiNote>
       )}
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <div className="flex flex-col gap-5 rounded-xl border border-border bg-card p-5 xl:col-span-2">
+        <div className="flex flex-col gap-5 rounded-lg border border-border bg-card p-5 xl:col-span-2">
+          <SectionHeading>Basics</SectionHeading>
+
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="name">
               <AiLabel text="Product Name" isAi={aiFields.has('name')} />
@@ -226,9 +278,11 @@ export function ProductFormPage() {
               id="name"
               {...register('name')}
               aria-invalid={!!errors.name}
-              className={needsInput.has('name') ? 'ring-2 ring-amber-400' : undefined}
+              aria-describedby={errors.name ? 'name-error' : undefined}
+              className={needsInput.has('name') ? NEEDS_INPUT_CLS : undefined}
             />
-            {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+            <NeedsInput show={needsInput.has('name')} />
+            {errors.name && <p id="name-error" className="text-xs text-destructive">{errors.name.message}</p>}
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -263,11 +317,33 @@ export function ProductFormPage() {
                 id="destination"
                 {...register('destination')}
                 aria-invalid={!!errors.destination}
-                className={needsInput.has('destination') ? 'ring-2 ring-amber-400' : undefined}
+                aria-describedby={errors.destination ? 'destination-error' : undefined}
+                className={needsInput.has('destination') ? NEEDS_INPUT_CLS : undefined}
               />
-              {errors.destination && <p className="text-xs text-destructive">{errors.destination.message}</p>}
+              <NeedsInput show={needsInput.has('destination')} />
+              {errors.destination && (
+                <p id="destination-error" className="text-xs text-destructive">{errors.destination.message}</p>
+              )}
             </div>
           </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="description">
+              <AiLabel text="Description" isAi={aiFields.has('description')} />
+            </Label>
+            <Textarea
+              id="description"
+              rows={4}
+              {...register('description')}
+              aria-invalid={!!errors.description}
+              aria-describedby={errors.description ? 'description-error' : undefined}
+            />
+            {errors.description && (
+              <p id="description-error" className="text-xs text-destructive">{errors.description.message}</p>
+            )}
+          </div>
+
+          <SectionHeading className="border-t border-border pt-5">Pricing &amp; inventory</SectionHeading>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
@@ -281,9 +357,11 @@ export function ProductFormPage() {
                 step="0.01"
                 {...register('price', { valueAsNumber: true })}
                 aria-invalid={!!errors.price}
-                className={needsInput.has('price') ? 'ring-2 ring-amber-400' : undefined}
+                aria-describedby={errors.price ? 'price-error' : undefined}
+                className={needsInput.has('price') ? NEEDS_INPUT_CLS : undefined}
               />
-              {errors.price && <p className="text-xs text-destructive">{errors.price.message}</p>}
+              <NeedsInput show={needsInput.has('price')} />
+              {errors.price && <p id="price-error" className="text-xs text-destructive">{errors.price.message}</p>}
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="inventoryCount">
@@ -296,19 +374,17 @@ export function ProductFormPage() {
                 step="1"
                 {...register('inventoryCount', { valueAsNumber: true })}
                 aria-invalid={!!errors.inventoryCount}
-                className={needsInput.has('inventoryCount') ? 'ring-2 ring-amber-400' : undefined}
+                aria-describedby={errors.inventoryCount ? 'inventoryCount-error' : undefined}
+                className={needsInput.has('inventoryCount') ? NEEDS_INPUT_CLS : undefined}
               />
-              {errors.inventoryCount && <p className="text-xs text-destructive">{errors.inventoryCount.message}</p>}
+              <NeedsInput show={needsInput.has('inventoryCount')} />
+              {errors.inventoryCount && (
+                <p id="inventoryCount-error" className="text-xs text-destructive">{errors.inventoryCount.message}</p>
+              )}
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="description">
-              <AiLabel text="Description" isAi={aiFields.has('description')} />
-            </Label>
-            <Textarea id="description" rows={4} {...register('description')} aria-invalid={!!errors.description} />
-            {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
-          </div>
+          <SectionHeading className="border-t border-border pt-5">Validity</SectionHeading>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
@@ -319,9 +395,14 @@ export function ProductFormPage() {
                 id="validFrom"
                 type="date"
                 {...register('validFrom')}
-                className={needsInput.has('validFrom') ? 'ring-2 ring-amber-400' : undefined}
+                aria-invalid={!!errors.validFrom}
+                aria-describedby={errors.validFrom ? 'validFrom-error' : undefined}
+                className={needsInput.has('validFrom') ? NEEDS_INPUT_CLS : undefined}
               />
-              {errors.validFrom && <p className="text-xs text-destructive">{errors.validFrom.message}</p>}
+              <NeedsInput show={needsInput.has('validFrom')} />
+              {errors.validFrom && (
+                <p id="validFrom-error" className="text-xs text-destructive">{errors.validFrom.message}</p>
+              )}
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="validUntil">
@@ -331,16 +412,23 @@ export function ProductFormPage() {
                 id="validUntil"
                 type="date"
                 {...register('validUntil')}
-                className={needsInput.has('validUntil') ? 'ring-2 ring-amber-400' : undefined}
+                aria-invalid={!!errors.validUntil}
+                aria-describedby={errors.validUntil ? 'validUntil-error' : undefined}
+                className={needsInput.has('validUntil') ? NEEDS_INPUT_CLS : undefined}
               />
-              {errors.validUntil && <p className="text-xs text-destructive">{errors.validUntil.message}</p>}
+              <NeedsInput show={needsInput.has('validUntil')} />
+              {errors.validUntil && (
+                <p id="validUntil-error" className="text-xs text-destructive">{errors.validUntil.message}</p>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-border px-4 py-3">
+          <div className="flex items-center justify-between gap-4 border-t border-border pt-5">
             <div>
               <p className="text-sm font-medium">Status</p>
-              <p className="text-xs text-muted-foreground">{status === 'active' ? 'Visible in listings' : 'Hidden from listings'}</p>
+              <p className="text-xs text-muted-foreground">
+                {status === 'active' ? 'Visible in listings' : 'Hidden from listings'}
+              </p>
             </div>
             <Controller
               control={control}
@@ -350,6 +438,8 @@ export function ProductFormPage() {
               )}
             />
           </div>
+
+          <SectionHeading className="border-t border-border pt-5">Content</SectionHeading>
 
           <Controller
             control={control}
@@ -397,7 +487,10 @@ export function ProductFormPage() {
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-card/95 px-4 py-3 backdrop-blur sm:px-6 lg:pl-64">
+      {/* Tracks the sidebar rail via the inherited --sidebar-w set by
+          AppLayout — a fixed element still inherits custom properties from
+          its DOM ancestors, so this stays aligned when the rail collapses. */}
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-card/95 px-4 py-3 backdrop-blur transition-[padding] duration-200 sm:px-6 md:pl-(--sidebar-w)">
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={() => navigate('/products')}>
             Cancel
