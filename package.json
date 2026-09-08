@@ -8,7 +8,13 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "clean": "turbo clean",
-    "test": "turbo test"
+    "test": "turbo test",
+    "docker:dev": "node scripts/docker-up.mjs dev",
+    "docker:dev:down": "docker compose -f docker/compose.dev.yml down",
+    "docker:dev:logs": "docker compose -f docker/compose.dev.yml logs -f",
+    "docker:prod": "node scripts/docker-up.mjs prod",
+    "docker:prod:down": "docker compose -f docker/compose.prod.yml down",
+    "docker:prod:logs": "docker compose -f docker/compose.prod.yml logs -f"
   },
   "devDependencies": {
     "prettier": "3.9.6",
