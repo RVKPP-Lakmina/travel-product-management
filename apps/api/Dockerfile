@@ -1,9 +1,8 @@
 # syntax=docker/dockerfile:1
 
 # ----------------------------------------------------------------------------
-# base -- shared setup for both the dev and prod build paths. Manifests only
-# in this layer (not source) so `pnpm install` is cached across rebuilds
-# that only touch application code.
+# base -- shared setup for both build paths. Manifests only in this layer
+# (not source) so `pnpm install` is cached across code-only rebuilds.
 # ----------------------------------------------------------------------------
 FROM node:22-alpine AS base
 RUN apk add --no-cache tini
@@ -18,8 +17,8 @@ COPY packages/typescript-config/package.json packages/typescript-config/package.
 COPY packages/eslint-config/package.json packages/eslint-config/package.json
 
 # ----------------------------------------------------------------------------
-# development -- unchanged from before: bind-mounted by docker/compose.dev.yml,
-# runs the Nest dev server with hot reload.
+# development -- bind-mounted by docker/compose.dev.yml, runs the Nest dev
+# server with hot reload.
 # ----------------------------------------------------------------------------
 FROM base AS development
 COPY . .
