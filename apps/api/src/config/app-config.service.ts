@@ -42,11 +42,18 @@ export class AppConfigService {
   }
 
   get supabaseJwksUrl(): string {
+    // Fetched over the network — must use the URL the API can actually
+    // reach, i.e. SUPABASE_URL.
     return `${this.supabaseUrl}/auth/v1/.well-known/jwks.json`;
   }
 
   get supabaseIssuer(): string {
-    return `${this.supabaseUrl}/auth/v1`;
+    // A string-equality check against the token's `iss` claim — must match
+    // the URL the BROWSER signed in against, which is not always the one
+    // the API reaches Supabase on (see SUPABASE_JWT_ISSUER).
+    return (
+      this.config.get('SUPABASE_JWT_ISSUER', { infer: true }) ?? `${this.supabaseUrl}/auth/v1`
+    );
   }
 
   get openaiApiKey(): string {
