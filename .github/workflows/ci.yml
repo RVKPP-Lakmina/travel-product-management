@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint, typecheck, test, build (all packages)
+        run: pnpm turbo run lint check-types test build
+
+      - name: Dependency audit (high+ severity)
+        run: pnpm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Secret-scan apps/web source
+        run: |
+          PATTERN='VITE_[A-Z_]*(SERVICE_ROLE|SECRET_KEY|OPENAI_API_KEY)|sk-[A-Za-z0-9]{10,}|sb_secret_[A-Za-z0-9_-]+'
+          if grep -rE "$PATTERN" apps/web/src apps/web/*.ts apps/web/*.json 2>/dev/null; then
+            echo "::error::A server-only secret name or key-shaped value was found under apps/web -- see above."
+            exit 1
+          fi
+
+      - name: Secret-scan built web bundle
+        run: |
+          pnpm --filter web build
+          PATTERN='sk-[A-Za-z0-9]{10,}|sb_secret_[A-Za-z0-9_-]+'
+          if grep -rE "$PATTERN" apps/web/dist 2>/dev/null; then
+            echo "::error::A live-looking secret pattern was found in the built bundle -- see above."
+            exit 1
+          fi
+
+  docker-build:
+    name: Build production Docker images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Build api production image
+        run: docker build -f apps/api/Dockerfile --target production -t travel-api:ci .
+
+      - name: Build web production image
+        run: |
+          docker build -f apps/web/Dockerfile --target production \
+            --build-arg VITE_SUPABASE_URL=https://ci-placeholder.supabase.co \
+            --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_ci_placeholder \
+            -t travel-web:ci .
