@@ -16,7 +16,6 @@ pnpm_store
 .env
 .env.*
 !.env.example
-!.env.*.local
 
 # Turbo & cache
 .turbo
