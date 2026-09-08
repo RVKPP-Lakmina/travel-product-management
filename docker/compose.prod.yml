@@ -27,6 +27,13 @@ services:
       # is what actually reaches the host machine. Has no effect (and isn't
       # needed) once SUPABASE_URL points at a real hosted Supabase project.
       SUPABASE_URL: ${API_SUPABASE_URL:-http://host.docker.internal:54321}
+      # The browser signs in against the WEB_SUPABASE_URL baked into the
+      # bundle (default http://127.0.0.1:54321), so its tokens carry
+      # iss=http://127.0.0.1:54321/auth/v1 -- which won't match the
+      # host.docker.internal URL above. Pin the issuer to the browser's URL.
+      # When pointing at a hosted Supabase, set API_SUPABASE_URL,
+      # API_SUPABASE_ISSUER and WEB_SUPABASE_URL to that same project.
+      SUPABASE_JWT_ISSUER: ${API_SUPABASE_ISSUER:-http://127.0.0.1:54321/auth/v1}
     extra_hosts:
       # host-gateway makes host.docker.internal resolve on Linux too, not
       # just Docker Desktop (Windows/Mac), where it already works natively.
