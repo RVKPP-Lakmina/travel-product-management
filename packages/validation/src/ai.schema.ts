@@ -7,8 +7,7 @@ import { productResponseSchema } from './product.schema.js';
 // dates without ever asking it to compute one. The server resolves an
 // anchor name to a literal date from its own table (apps/api/src/ai/
 // generation/date-anchors.ts); the model's only job is picking the right
-// anchor, or reporting an explicit date the user actually typed. See
-// aiGeneratedProductWire.validity below and Phase 3c of the plan for why.
+// anchor, or reporting an explicit date the user actually typed.
 // ============================================================================
 export const DATE_ANCHORS = [
   'today',
