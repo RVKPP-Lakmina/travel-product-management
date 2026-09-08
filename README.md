@@ -197,6 +197,12 @@ info note under the dashboard tiles.
 - **RLS style-src `'unsafe-inline'`** on the nginx CSP is a known, bounded
   relaxation — React inline styles and Radix's positioning logic set the
   `style` attribute directly. `script-src` has no such relaxation.
+- **URI API versioning** (`/api/v1/*`, NestJS `VersioningType.URI` with
+  `defaultVersion: '1'`). A breaking change ships as `/api/v2` beside v1
+  rather than mutating the contract under a deployed SPA. Liveness and
+  readiness stay unversioned at `/api/health` so orchestrators track one
+  stable path. The web client's base URL (`VITE_API_URL`, default
+  `/api/v1`) and nginx's `/api/` proxy prefix cover both.
 
 ## Repository layout
 
