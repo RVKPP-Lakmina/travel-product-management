@@ -7,14 +7,11 @@ import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/co
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import { AiNote } from './ai-note'
+import { AiThinking } from './ai-thinking'
+import { GENERATE_PROMPTS } from './examples'
 import { useGenerateProduct } from './hooks'
 import { ApiError } from '@/lib/api'
-
-const EXAMPLE_PROMPTS = [
-  'Create a Dinner Buffet at Cinnamon Grand Colombo available until the end of this month.',
-  'A private sunrise safari at Yala National Park, LKR 45,000, valid for the next 3 months.',
-  'Airport transfer service from Bandaranaike Airport to Colombo hotels, available year-round.',
-]
 
 interface GenerateProductDialogProps {
   onApply: (draft: AiGenerateProductResponse['draft'], meta: AiGenerateProductResponse['meta']) => void
@@ -69,7 +66,7 @@ export function GenerateProductDialog({ onApply, trigger }: GenerateProductDialo
       <ResponsiveDialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="size-4.5 text-amber-500" />
+            <Sparkles className="size-4 text-amber-500" aria-hidden="true" />
             AI Product Generator
           </DialogTitle>
           <DialogDescription>Describe the product in plain language — we'll draft the details for you to review.</DialogDescription>
@@ -86,20 +83,20 @@ export function GenerateProductDialog({ onApply, trigger }: GenerateProductDialo
               maxLength={1000}
             />
             <div className="flex flex-wrap gap-2">
-              {EXAMPLE_PROMPTS.map((example) => (
+              {GENERATE_PROMPTS.map((example) => (
                 <button
                   key={example}
                   type="button"
                   onClick={() => setPrompt(example)}
-                  className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                  className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground outline-none transition-colors hover:border-primary/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {example.length > 46 ? `${example.slice(0, 46)}…` : example}
                 </button>
               ))}
             </div>
+            {generate.isPending && <AiThinking label="Analyzing your prompt…" />}
             <DialogFooter>
               <Button
-                variant="ai"
                 onClick={handleGenerate}
                 loading={generate.isPending}
                 disabled={prompt.trim().length < 5}
@@ -126,14 +123,13 @@ export function GenerateProductDialog({ onApply, trigger }: GenerateProductDialo
             </div>
 
             {result.meta.assumptions.length > 0 && (
-              <div className="rounded-lg border border-amber-500/30 bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-                <p className="mb-1 font-medium">AI assumptions</p>
+              <AiNote title="AI assumptions">
                 <ul className="list-disc space-y-0.5 pl-4">
                   {result.meta.assumptions.map((a) => (
                     <li key={a}>{a}</li>
                   ))}
                 </ul>
-              </div>
+              </AiNote>
             )}
 
             {result.meta.unresolvedFields.length > 0 && (
@@ -146,9 +142,7 @@ export function GenerateProductDialog({ onApply, trigger }: GenerateProductDialo
               <Button variant="secondary" onClick={reset}>
                 Regenerate
               </Button>
-              <Button variant="ai" onClick={handleApply}>
-                Use these details
-              </Button>
+              <Button onClick={handleApply}>Use these details</Button>
             </DialogFooter>
           </div>
         )}
