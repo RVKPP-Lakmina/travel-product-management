@@ -26,6 +26,7 @@ export function toProductResponse(row: ProductRow): ProductResponse {
     tags: row.tags,
     imageUrl: row.image_url,
     isExpired: isExpired(row.valid_until),
+    aiGenerated: row.ai_generated,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
