@@ -13,6 +13,8 @@ import { AppThrottlerGuard } from './common/guards/app-throttler.guard.js';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 import { HealthModule } from './health/health.module.js';
 import { ProductsModule } from './products/products.module.js';
+import { OpenAiClientModule } from './ai/openai.client.js';
+import { AiModule } from './ai/ai.module.js';
 
 const REQUEST_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -54,13 +56,15 @@ const REQUEST_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
     }),
     ThrottlerModule.forRoot([
       { name: 'default', ttl: 60_000, limit: 100 },
-      // Named but not yet applied to any controller — Phase 3's AI
-      // endpoints will opt into these with @Throttle({ ai: {...} }).
+      // Applied via @Throttle({ ai: {...} }) / @Throttle({ image: {...} })
+      // on AiController's routes (apps/api/src/ai/ai.controller.ts).
       { name: 'ai', ttl: 60_000, limit: 10 },
       { name: 'image', ttl: 300_000, limit: 5 },
     ]),
     HealthModule,
     ProductsModule,
+    OpenAiClientModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [
