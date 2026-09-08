@@ -1,6 +1,9 @@
 import type { CategorySlug } from '@travel/validation';
 
-/** Shape of a row from `public.products` or `public.products_listable` — both share the same columns. */
+/**
+ * Shape of a row from `public.products`, `public.products_listable`, or
+ * `public.products_expired` — all three share the same columns.
+ */
 export interface ProductRow {
   id: string;
   name: string;
@@ -17,6 +20,7 @@ export interface ProductRow {
   inclusions: string[];
   tags: string[];
   image_url: string | null;
+  ai_generated: boolean;
   created_by: string;
   created_at: string;
   updated_at: string;
