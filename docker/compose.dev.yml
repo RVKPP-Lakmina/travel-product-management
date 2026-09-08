@@ -1,0 +1,35 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+      target: development
+    container_name: travel-api-dev
+    working_dir: /workspace
+    volumes:
+      - ..:/workspace
+      - pnpm_store:/root/.local/share/pnpm/store
+    ports:
+      - "3000:3000"
+    env_file:
+      - ../apps/api/.env
+    command: pnpm --filter api start:dev
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      target: development
+    container_name: travel-web-dev
+    working_dir: /workspace
+    volumes:
+      - ..:/workspace
+      - pnpm_store:/root/.local/share/pnpm/store
+    ports:
+      - "5173:5173"
+    env_file:
+      - ../apps/web/.env
+    command: pnpm --filter web dev --host 0.0.0.0
+
+volumes:
+  pnpm_store:

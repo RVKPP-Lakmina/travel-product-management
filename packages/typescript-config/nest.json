@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "NestJS ESM",
+  "extends": "./base.json",
+  "compilerOptions": {
+    "composite": false,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "sourceMap": true,
+    "strictPropertyInitialization": false,
+    "target": "ES2022"
+  }
+}

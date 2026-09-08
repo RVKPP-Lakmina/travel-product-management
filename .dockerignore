@@ -1,0 +1,55 @@
+# Dependencies
+**/node_modules
+pnpm_store
+
+# Build artifacts
+**/dist
+**/.next
+**/build
+**/out
+
+# Git internals
+**/.git
+**/apps/api/.git
+
+# Environment files (secrets)
+.env
+.env.*
+!.env.example
+!.env.*.local
+
+# Turbo & cache
+.turbo
+.turbo-clone-temp
+.cache
+.next
+
+# Supabase
+supabase/.branches
+supabase/.temp
+supabase/functions/
+
+# Development
+node_modules
+.DS_Store
+*.pem
+debug.log
+
+# Build artifacts & temp
+*.pdf
+*.zip
+.vercel
+
+# IDE settings
+.vscode
+.idea
+*.swp
+*.swo
+
+# Tests & coverage
+coverage
+.nyc_output
+
+# OS
+Thumbs.db
+.DS_Store
