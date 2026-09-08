@@ -1,6 +1,5 @@
-# Explicit project name -- without it, Compose derives one from the
-# directory holding this file ("docker"), which is what produced the
-# generic docker-api/docker-web image and container names before this.
+# Explicit project name -- without it, Compose derives one from the parent
+# directory ("docker"), giving generic docker-api / docker-web names.
 name: travel-product-management-dev
 
 # The whole repo is bind-mounted into each container for hot reload, but
