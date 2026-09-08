@@ -14,6 +14,11 @@ services:
     env_file:
       - ../apps/api/.env
     environment:
+      # Overrides apps/api/.env's SUPABASE_URL, which is 127.0.0.1 --
+      # correct for running the API directly on the host, but 127.0.0.1
+      # INSIDE this container is the container's own loopback, not the
+      # host's. host.docker.internal is what actually reaches a locally
+      # running `supabase start` stack. Same reasoning as compose.prod.yml.
       SUPABASE_URL: ${API_SUPABASE_URL:-http://host.docker.internal:54321}
     extra_hosts:
       - host.docker.internal:host-gateway
