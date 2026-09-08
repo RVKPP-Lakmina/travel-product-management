@@ -1,3 +1,8 @@
+# Explicit project name -- without it, Compose derives one from the
+# directory holding this file ("docker"), which is what produced the
+# generic docker-api/docker-web image and container names before this.
+name: travel-product-management-dev
+
 services:
   api:
     build:
