@@ -27,6 +27,11 @@ export const createProductSchema = z
     highlights: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
     inclusions: z.array(z.string().trim().min(1).max(200)).max(20).default([]),
     tags: z.array(z.string().trim().min(1).max(60)).max(20).default([]),
+    // Cosmetic provenance hint — true when this product was created from an
+    // AI draft. Intentionally client-settable (see migration 0006): it is
+    // not an authorization or billing signal, so a dishonest value only
+    // mislabels the sparkle icon. `created_by` etc. remain server-only.
+    aiGenerated: z.boolean().default(false),
   })
   .superRefine((val, ctx) => {
     if (val.validUntil < val.validFrom) {
@@ -88,6 +93,20 @@ export const productQuerySchema = z.strictObject({
 export type ProductQuery = z.infer<typeof productQuerySchema>;
 
 /**
+ * Query params for GET /products/expired — the browse view over
+ * `products_expired` (rows products_listable hides). Intentionally minimal:
+ * this list exists to *find and renew* lapsed products, not to slice them.
+ * Sort is fixed server-side to most-recently-expired first.
+ */
+export const expiredQuerySchema = z.strictObject({
+  category: categorySchema.optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  offset: z.coerce.number().int().min(0).max(1000).default(0),
+});
+
+export type ExpiredQuery = z.infer<typeof expiredQuerySchema>;
+
+/**
  * Shape returned to clients. `isExpired` is always computed server-side
  * (never trust or accept it from a client) so the browser never has to do
  * date math or guess a timezone — see products.service's mapper.
@@ -109,6 +128,7 @@ export const productResponseSchema = z.object({
   tags: z.array(z.string()),
   imageUrl: z.url().nullable(),
   isExpired: z.boolean(),
+  aiGenerated: z.boolean(),
   createdBy: z.uuid(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
