@@ -3,6 +3,17 @@
 # generic docker-api/docker-web image and container names before this.
 name: travel-product-management-dev
 
+# The whole repo is bind-mounted into each container for hot reload, but
+# node_modules is NOT -- it's masked by the named volumes below. The host's
+# node_modules is built for the host platform (on Windows/macOS its
+# .modules.yaml records a host-only pnpm store path); a Linux container
+# reading that decides the tree is foreign and tries to purge it, which
+# aborts with ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY and the container
+# never starts -- so neither the API nor the web server come up. Each
+# container instead keeps the Linux node_modules that `RUN pnpm install`
+# produced in its image, and the host's copy is left untouched for
+# host-native `pnpm dev`.
+
 services:
   api:
     build:
@@ -13,6 +24,11 @@ services:
     working_dir: /workspace
     volumes:
       - ..:/workspace
+      - deps_root:/workspace/node_modules
+      - deps_api:/workspace/apps/api/node_modules
+      - deps_web:/workspace/apps/web/node_modules
+      - deps_validation:/workspace/packages/validation/node_modules
+      - deps_eslint_config:/workspace/packages/eslint-config/node_modules
       - pnpm_store:/root/.local/share/pnpm/store
     ports:
       - "3000:3000"
@@ -25,6 +41,9 @@ services:
       # host's. host.docker.internal is what actually reaches a locally
       # running `supabase start` stack. Same reasoning as compose.prod.yml.
       SUPABASE_URL: ${API_SUPABASE_URL:-http://host.docker.internal:54321}
+      # pnpm runs non-interactively here -- never prompt before reconciling
+      # node_modules against the lockfile, just do it.
+      CI: "true"
     extra_hosts:
       - host.docker.internal:host-gateway
     command: pnpm --filter api start:dev
@@ -38,12 +57,28 @@ services:
     working_dir: /workspace
     volumes:
       - ..:/workspace
+      - deps_root:/workspace/node_modules
+      - deps_api:/workspace/apps/api/node_modules
+      - deps_web:/workspace/apps/web/node_modules
+      - deps_validation:/workspace/packages/validation/node_modules
+      - deps_eslint_config:/workspace/packages/eslint-config/node_modules
       - pnpm_store:/root/.local/share/pnpm/store
     ports:
       - "5173:5173"
     env_file:
       - ../apps/web/.env
+    environment:
+      CI: "true"
+      # The browser runs on the host, so the API it calls is the published
+      # host port. Overrides apps/web/.env in case that was edited for a
+      # non-Docker setup.
+      VITE_API_URL: http://localhost:3000/api
     command: pnpm --filter web dev --host 0.0.0.0
 
 volumes:
   pnpm_store:
+  deps_root:
+  deps_api:
+  deps_web:
+  deps_validation:
+  deps_eslint_config:
