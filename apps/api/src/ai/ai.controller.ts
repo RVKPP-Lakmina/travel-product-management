@@ -9,7 +9,7 @@ import {
   Post,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { Throttle, SkipThrottle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { aiGenerateProductRequestSchema, aiSearchRequestSchema } from '@travel/validation';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
@@ -46,16 +46,12 @@ export class AiController {
     private readonly aiUsage: AiUsageService,
   ) {}
 
-  // @nestjs/throttler applies EVERY registered named bucket (default, ai,
-  // image) to a route by default — @Throttle only overrides the limits for
-  // the bucket(s) it names, it does not scope the route to just those.
-  // Without the @SkipThrottle below, this route would ALSO be governed by
-  // the unrelated `image` bucket's much tighter 5-per-300s limit, which is
-  // exactly the bug an end-to-end boot test against this endpoint caught
-  // (the 5th call 429'd instead of the 11th).
+  // Tightens the shared `default` bucket for this handler only (10/min
+  // instead of 100/min). @Throttle overrides a bucket's limits per
+  // class+handler, so this doesn't touch any other route's allowance.
+  // The 200/day cost ceiling is enforced separately by AiUsageService.
   @Post('ai/generate-product')
-  @Throttle({ ai: { limit: 10, ttl: 60_000 } })
-  @SkipThrottle({ image: true })
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async generateProduct(
     @CurrentUser() user: AuthenticatedUser,
     @Body(new ZodValidationPipe(aiGenerateProductRequestSchema)) body: { prompt: string },
@@ -74,8 +70,7 @@ export class AiController {
   }
 
   @Post('ai/search')
-  @Throttle({ ai: { limit: 10, ttl: 60_000 } })
-  @SkipThrottle({ image: true })
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async search(
     @CurrentUser() user: AuthenticatedUser,
     @Body(new ZodValidationPipe(aiSearchRequestSchema)) body: { query: string },
@@ -88,9 +83,9 @@ export class AiController {
     return this.searchService.search(user.id, body.query);
   }
 
+  // Image generation is the most expensive call — 5 per 5 minutes.
   @Post('products/:id/image')
-  @Throttle({ image: { limit: 5, ttl: 300_000 } })
-  @SkipThrottle({ ai: true })
+  @Throttle({ default: { limit: 5, ttl: 300_000 } })
   async generateImage(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthenticatedUser) {
     await this.assertQuota(user.id);
     try {
