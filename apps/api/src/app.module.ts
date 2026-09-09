@@ -54,13 +54,14 @@ const REQUEST_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
         },
       }),
     }),
-    ThrottlerModule.forRoot([
-      { name: 'default', ttl: 60_000, limit: 100 },
-      // Applied via @Throttle({ ai: {...} }) / @Throttle({ image: {...} })
-      // on AiController's routes (apps/api/src/ai/ai.controller.ts).
-      { name: 'ai', ttl: 60_000, limit: 10 },
-      { name: 'image', ttl: 300_000, limit: 5 },
-    ]),
+    // One global bucket. @nestjs/throttler applies EVERY registered named
+    // bucket to EVERY route (a route can only opt out, per bucket, with
+    // @SkipThrottle) — so a second "ai" or "image" bucket here would also
+    // govern every product/dashboard route and strangle it at the tighter
+    // limit. The AI routes instead tighten this same `default` bucket
+    // per-handler via @Throttle (ai.controller.ts); the storage key is
+    // per class+handler, so each route still counts independently.
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]),
     HealthModule,
     ProductsModule,
     OpenAiClientModule,
