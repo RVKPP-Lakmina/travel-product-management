@@ -76,7 +76,7 @@ pnpm --filter web dev          # Starts SPA on http://localhost:5173
 
 ## 🧪 Testing
 
-Run the full test suite (77 API tests + 29 shared-schema tests):
+Run the full test suite (84 API tests + 37 shared-schema tests):
 
 ```sh
 pnpm turbo run build check-types lint test
