@@ -13,10 +13,10 @@ export class AiQuotaExceededError extends Error {
 
 /**
  * A daily-per-user call counter, independent of the per-minute throttler
- * buckets (`ai`/`image` in ThrottlerModule.forRoot). The throttler alone
- * does not stop a slow-drip cost attack — a caller who stays just under
- * 10 calls/minute for hours is invisible to it but still runs up a real
- * OpenAI bill. This closes that gap. Uses the `ai_usage` table added in
+ * (the tightened `default` bucket on AiController's routes). The throttler
+ * alone does not stop a slow-drip cost attack — a caller who stays just
+ * under 10 calls/minute for hours is invisible to it but still runs up a
+ * real OpenAI bill. This closes that gap. Uses the `ai_usage` table in
  * supabase/migrations/20260908000001_init.sql, which the Data API never
  * exposes to any client role (RLS + a blanket revoke in
  * 20260908000002_rls.sql) — only this service's service-role client can
