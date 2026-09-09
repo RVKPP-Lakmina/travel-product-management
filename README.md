@@ -53,7 +53,7 @@ You can run the app via Docker (closest to production) or locally via pnpm.
 **Option A: Docker (Recommended)**
 
 ```sh
-pnpm docker:prod
+pnpm docker:dev
 ```
 
 Once running, log in with the seeded demo account:

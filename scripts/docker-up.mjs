@@ -14,7 +14,7 @@ if (mode !== 'dev' && mode !== 'prod') {
 
 const composeFile = `docker/compose.${mode}.yml`;
 const label = mode === 'prod' ? 'production' : 'development';
-const appUrl = mode === 'prod' ? 'http://localhost:5173' : 'http://localhost:5173';
+const appUrl = mode === 'prod' ? 'http://localhost' : 'http://localhost:5173';
 
 function run(cmd, args) {
   return new Promise((resolve, reject) => {
